@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -97,7 +97,7 @@ sub set_counters {
                 closure_custom_perfdata => $self->can('custom_count_perfdata')
             }
         },
-        { label => 'qos-policy-traffic-dropped', nlabel => 'appqos.policy.traffic.dropped.bytespersecond', set => {
+        { label => 'qos-policy-traffic-dropped', nlabel => 'qos.policy.traffic.dropped.bytespersecond', set => {
                 key_values => [
                     { name => 'drop_bytes', per_second => 1 }, { name => 'org_name' },
                     { name => 'policy_name' }, { name => 'rule_name' }

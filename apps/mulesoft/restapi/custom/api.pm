@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -54,14 +54,13 @@ sub new {
             'proto:s'               => { name => 'proto' },
             'timeout:s'             => { name => 'timeout' },
             'reload-cache-time:s'   => { name => 'reload_cache_time' },
-            'authent-endpoint:s'    => { name => 'authent_endpoint'},
-            'monitoring-endpoint:s' => { name => 'monitoring_endpoint'},
+            'authent-endpoint:s'    => { name => 'authent_endpoint' },
+            'monitoring-endpoint:s' => { name => 'monitoring_endpoint' }
         });
     }
     $options{options}->add_help(package => __PACKAGE__, sections => 'REST API OPTIONS', once => 1);
 
     $self->{output} = $options{output};
-    $self->{mode} = $options{mode};
     $self->{http} = centreon::plugins::http->new(%options);
     $self->{cache} = centreon::plugins::statefile->new(%options);
 
@@ -74,21 +73,7 @@ sub set_options {
     $self->{option_results} = $options{option_results};
 }
 
-sub set_defaults {
-    my ($self, %options) = @_;
-
-    foreach (keys %{$options{default}}) {
-        if ($_ eq $self->{mode}) {
-            for (my $i = 0; $i < scalar(@{$options{default}->{$_}}); $i++) {
-                foreach my $opt (keys %{$options{default}->{$_}[$i]}) {
-                    if (!defined($self->{option_results}->{$opt}[$i])) {
-                        $self->{option_results}->{$opt}[$i] = $options{default}->{$_}[$i]->{$opt};
-                    }
-                }
-            }
-        }
-    }
-}
+sub set_defaults {}
 
 sub check_options {
     my ($self, %options) = @_;
@@ -98,7 +83,9 @@ sub check_options {
     $self->{proto} = (defined($self->{option_results}->{proto})) ? $self->{option_results}->{proto} : 'https';
     $self->{timeout} = (defined($self->{option_results}->{timeout})) ? $self->{option_results}->{timeout} : 10;
     $self->{authent_endpoint} = (defined($self->{option_results}->{authent_endpoint})) ? $self->{option_results}->{authent_endpoint} : '/accounts/login';
-    $self->{monitoring_endpoint} = (defined($self->{option_results}->{monitoring_endpoint})) ? $self->{option_results}->{monitoring_endpoint} : '/hybrid/api/v1';
+    $self->{monitoring_endpoint}->{arm} = (defined($self->{option_results}->{monitoring_endpoint})) ? $self->{option_results}->{monitoring_endpoint} : '/hybrid/api/v1';
+    $self->{monitoring_endpoint}->{mq_admin} = (defined($self->{option_results}->{monitoring_endpoint})) ? $self->{option_results}->{monitoring_endpoint} : '/mq/admin/api/v1';
+    $self->{monitoring_endpoint}->{mq_stats} = (defined($self->{option_results}->{monitoring_endpoint})) ? $self->{option_results}->{monitoring_endpoint} : '/mq/stats/api/v1';
     $self->{api_username} = (defined($self->{option_results}->{api_username})) ? $self->{option_results}->{api_username} : '';
     $self->{api_password} = (defined($self->{option_results}->{api_password})) ? $self->{option_results}->{api_password} : '';
     $self->{environment_id} = (defined($self->{option_results}->{environment_id})) ? $self->{option_results}->{environment_id} : '';
@@ -106,14 +93,14 @@ sub check_options {
     $self->{reload_cache_time} = (defined($self->{option_results}->{reload_cache_time})) ? $self->{option_results}->{reload_cache_time} : 180;
     $self->{cache}->check_options(option_results => $self->{option_results});
 
-    if (!defined($self->{environment_id}) || $self->{environment_id} eq '' || !defined($self->{organization_id}) || $self->{organization_id} eq '' ) {
-            $self->{output}->add_option_msg(short_msg => "--environment-id and --organization-id must be set");
-            $self->{output}->option_exit();
-        }
-    if (!defined($self->{api_username}) || $self->{api_username} eq '' || !defined($self->{api_password}) || $self->{api_password} eq '' ) {
-            $self->{output}->add_option_msg(short_msg => "--api-username and --api-password must be set");
-            $self->{output}->option_exit();
-        }
+    if ($self->{environment_id} eq '' || $self->{organization_id} eq '' ) {
+        $self->{output}->add_option_msg(short_msg => "--environment-id and --organization-id must be set");
+        $self->{output}->option_exit();
+    }
+    if ($self->{api_username} eq '' || $self->{api_password} eq '' ) {
+        $self->{output}->add_option_msg(short_msg => "--api-username and --api-password must be set");
+        $self->{output}->option_exit();
+    }
 
     return 0;
 }
@@ -198,9 +185,6 @@ sub request_api {
 
     $self->settings(content_type => 'application/x-www-form-urlencoded', environment_header => 1, organization_header => 1);
 
-    $self->{output}->output_add(long_msg => "URL: '" . $self->{proto} . '://' . $self->{hostname} . ':' . $self->{port} .
-        $options{url_path} . "'", debug => 1);
-
     my $content = $self->{http}->request(%options);
 
     if (!defined($content) || $content eq '') {
@@ -212,63 +196,55 @@ sub request_api {
     eval {
         $decoded = JSON::XS->new->utf8->decode($content);
     };
+
     if ($@) {
-        $self->{output}->output_add(long_msg => $content, debug => 1);
         $self->{output}->add_option_msg(short_msg => "Cannot decode response (add --debug option to display returned content)");
-        $self->{output}->option_exit();
-    }
-    if (defined($decoded->{error_code})) {
-        $self->{output}->output_add(long_msg => "Error message : " . $decoded->{error}, debug => 1);
-        $self->{output}->add_option_msg(short_msg => "API returns error code '" . $decoded->{error_code} . "' (add --debug option for detailed message)");
         $self->{output}->option_exit();
     }
 
     return $decoded;
 }
 
-sub list_applications {
+
+sub list_objects {
     my ($self, %options) = @_;
 
-    my $url_path = $self->{monitoring_endpoint} . '/applications';
-    my $response = $self->request_api(method => 'GET', url_path => $url_path);
+    if ($options{api_type} eq 'arm') {
+        my $url_path = $self->{monitoring_endpoint}->{arm} . $options{endpoint};
+        my $response = $self->request_api(method => 'GET', url_path => $url_path);
+        return $response->{data};
+    };
 
-    return $response->{data};
+    if ($options{api_type} eq 'mq') {
+        my $url_path = $self->{monitoring_endpoint}->{mq_admin} .
+            '/organizations/' . $self->{organization_id} .
+            '/environments/' . $self->{environment_id} .
+            '/regions/' . $options{region_id} .
+            $options{endpoint};
+        my $response = $self->request_api(method => 'GET', url_path => $url_path);
+        return $response;
+    };
 }
 
-sub get_application_status {
+sub get_objects_status {
     my ($self, %options) = @_;
 
-    my $url_path = $self->{monitoring_endpoint} . '/applications/' . $options{applicationId};
-    my $response = $self->request_api(method => 'GET', url_path => $url_path);
+    if ($options{api_type} eq 'arm') {
+        my $url_path = $self->{monitoring_endpoint}->{arm} . $options{endpoint} . $options{object_id};
+        my $response = $self->request_api(method => 'GET', url_path => $url_path);
+        return $response->{data};
+    };
 
-    return $response->{data};
-}
+    if ($options{api_type} eq 'mq') {
+        my $url_path = $self->{monitoring_endpoint}->{mq_stats} .
+            '/organizations/' . $self->{organization_id} .
+            '/environments/' . $self->{environment_id} .
+            '/regions/' . $options{region_id} .
+            $options{endpoint} . '/' . $options{object_id};
+        my $response = $self->request_api(method => 'GET', url_path => $url_path, get_param => $options{get_param});
+        return $response;
+    };
 
-sub list_servers {
-    my ($self, %options) = @_;
-
-    my $url_path = $self->{monitoring_endpoint} . '/servers/';
-    my $response = $self->request_api(method => 'GET', url_path => $url_path);
-
-    return $response->{data};
-}
-
-sub get_server_status {
-    my ($self, %options) = @_;
-
-    my $url_path = $self->{monitoring_endpoint} . '/servers/' . $options{serverId};
-    my $response = $self->request_api(method => 'GET', url_path => $url_path);
-
-    return $response->{data};
-}
-
-sub list_clusters {
-    my ($self, %options) = @_;
-
-    my $url_path = $self->{monitoring_endpoint} . '/clusters/';
-    my $response = $self->request_api(method => 'GET', url_path => $url_path);
-
-    return $response->{data};
 }
 
 sub cache_hosts {

@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -180,7 +180,7 @@ sub set_counters {
                 ]
             }
         },
-        { label => 'session-rate', nlabel => 'virtualdomain.sessions.rate.persecond', set => {
+        { label => 'sessions-rate', nlabel => 'virtualdomain.sessions.rate.persecond', set => {
                 key_values => [ { name => 'session_rate' }, { name => 'display' } ],
                 output_template => 'session setup rate: %d/s',
                 perfdatas => [

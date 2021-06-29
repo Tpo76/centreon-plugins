@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -29,7 +29,7 @@ sub set_counters {
     my ($self, %options) = @_;
 
     $self->{maps_counters_type} = [
-        { name => 'global', type => 0 },
+        { name => 'global', type => 0 }
     ];
 
     $self->{maps_counters}->{global} = [
@@ -37,8 +37,8 @@ sub set_counters {
                 key_values => [ { name => 'sessions' } ],
                 output_template => 'total current sessions: %d',
                 perfdatas => [
-                    { value => 'sessions', template => '%d', min => 0 },
-                ],
+                    { template => '%d', min => 0 }
+                ]
             }
         }
     ];
@@ -89,7 +89,7 @@ __END__
 
 =head1 MODE
 
-Check sessions.
+Check sessions (since CE 8.2)
 
 =over 8
 

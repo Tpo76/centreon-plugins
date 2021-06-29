@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -34,7 +34,7 @@ sub set_counters {
             group => [
                 { name => 'global', type => 0 },
                 { name => 'links', display_long => 1, cb_prefix_output => 'prefix_link_output',
-                  message_multiple => 'All links QOE are ok', type => 1 },
+                  message_multiple => 'All links QOE are ok', type => 1 }
             ]
         }
     ];
@@ -44,29 +44,34 @@ sub set_counters {
                 key_values => [ { name => 'voice' } ],
                 output_template => 'Global voice QOE: %s',
                 perfdatas => [
-                    { value => 'voice', template => '%s',
-                      min => 0, max => 10, label_extra_instance => 1  },
-                ],
+                    { template => '%s', min => 0, max => 10, label_extra_instance => 1  }
+                ]
             }
         },
         { label => 'qoe-video-global', nlabel => 'global.qoe.video.count', set => {
                 key_values => [ { name => 'video' } ],
                 output_template => 'Global video QOE: %s',
                 perfdatas => [
-                    { value => 'video', template => '%s',
-                      min => 0, max => 10, label_extra_instance => 1  },
-                ],
+                    { template => '%s', min => 0, max => 10, label_extra_instance => 1  }
+                ]
             }
         },
         { label => 'qoe-transactional-global', nlabel => 'global.qoe.transactional.count', set => {
                 key_values => [ { name => 'transactional' } ],
                 output_template => 'Global transactional QOE: %s',
                 perfdatas => [
-                    { value => 'transactional', template => '%s',
-                      min => 0, max => 10, label_extra_instance => 1  },
-                ],
+                    { template => '%s', min => 0, max => 10, label_extra_instance => 1  }
+                ]
             }
         },
+        { label => 'edge-links-count', nlabel => 'global.links.total.count', set => {
+                key_values => [ { name => 'link_count' } ],
+                output_template => '%s link(s)',
+                perfdatas => [
+                    { template => '%d', unit => '', min => 0, label_extra_instance => 1 }
+                ]
+            }
+        }
     ];
 
     $self->{maps_counters}->{links} = [
@@ -74,27 +79,24 @@ sub set_counters {
                 key_values => [ { name => 'voice' }, { name => 'display' }, { name => 'id' } ],
                 output_template => 'Voice QOE: %s',
                 perfdatas => [
-                    { value => 'voice', template => '%s',
-                      min => 0, max => 10, label_extra_instance => 1 },
-                ],
+                    { template => '%s', min => 0, max => 10, label_extra_instance => 1 }
+                ]
             }
         },
         { label => 'qoe-video', nlabel => 'link.qoe.video.count', set => {
                 key_values => [ { name => 'video' }, { name => 'display' }, { name => 'id' } ],
                 output_template => 'Video QOE: %s',
                 perfdatas => [
-                    { value => 'video', template => '%s',
-                      min => 0, max => 10, label_extra_instance => 1 },
-                ],
+                    { template => '%s', min => 0, max => 10, label_extra_instance => 1 }
+                ]
             }
         },
         { label => 'qoe-transactional', nlabel => 'link.qoe.transactional.count', set => {
                 key_values => [ { name => 'transactional' }, { name => 'display' }, { name => 'id' } ],
                 output_template => 'Transactional QOE: %s',
                 perfdatas => [
-                    { value => 'transactional', template => '%s',
-                      min => 0, max => 10, label_extra_instance => 1 },
-                ],
+                    { template => '%s', min => 0, max => 10, label_extra_instance => 1 }
+                ]
             }
         },
     ];
@@ -125,7 +127,7 @@ sub new {
 
     $options{options}->add_options(arguments => {
         'filter-edge-name:s' => { name => 'filter_edge_name' },
-        'filter-link-name:s' => { name => 'filter_link_name' },
+        'filter-link-name:s' => { name => 'filter_link_name' }
     });
 
     return $self;
@@ -136,13 +138,12 @@ sub check_options {
     $self->SUPER::check_options(%options);
 
     $self->{timeframe} = defined($self->{option_results}->{timeframe}) ? $self->{option_results}->{timeframe} : 900;
-    $self->change_macros(macros => ['warning_status', 'critical_status']);
 }
 
 sub manage_selection {
     my ($self, %options) = @_;
 
-    my $results = $options{custom}->list_edges;
+    my $results = $options{custom}->list_edges();
 
     $self->{edges} = {};
     foreach my $edge (@{$results}) {
@@ -170,7 +171,7 @@ sub manage_selection {
         $self->{edges}->{$edge->{name}}->{global} = {
             voice => $qoes->{overallLinkQuality}->{score}->{0},
             video => $qoes->{overallLinkQuality}->{score}->{1},
-            transactional => $qoes->{overallLinkQuality}->{score}->{2},
+            transactional => $qoes->{overallLinkQuality}->{score}->{2}
         };
 
         foreach my $link (@{$links}) {
@@ -182,12 +183,13 @@ sub manage_selection {
                 next;
             }
 
+            $self->{edges}->{$edge->{name}}->{global}->{link_count}++;
             $self->{edges}->{$edge->{name}}->{links}->{$link->{link}->{displayName}} = {
                 id => $link->{linkId},
                 display => $link->{link}->{displayName},
                 voice => $qoes->{$link->{link}->{internalId}}->{score}->{0},
                 video => $qoes->{$link->{link}->{internalId}}->{score}->{1},
-                transactional => $qoes->{$link->{link}->{internalId}}->{score}->{2},
+                transactional => $qoes->{$link->{link}->{internalId}}->{score}->{2}
             };
         }
     }
@@ -219,7 +221,7 @@ Filter link by name (Can be a regexp).
 =item B<--warning-*> B<--critical-*>
 
 Thresholds.
-Can be: 'qoe-voice-global', 'qoe-video-global', 'qoe-transactional-global' (global values) and/or
+Can be: 'edge-links-count', 'qoe-voice-global', 'qoe-video-global', 'qoe-transactional-global' (global values) and/or
 'qoe-voice', 'qoe-video', 'qoe-transactional' (per link values).
 
 =back

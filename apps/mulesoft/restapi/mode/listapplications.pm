@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -42,16 +42,11 @@ sub check_options {
     $self->SUPER::init(%options);
 }
 
-sub manage_selection {
-    my ($self, %options) = @_;
-
-    $self->{data} = $options{custom}->list_applications();
-}
 
 sub run {
     my ($self, %options) = @_;
 
-    my $result = $options{custom}->list_applications();
+    my $result = $options{custom}->list_objects(api_type => 'arm', endpoint => '/applications');
     foreach my $application (@{$result}) {
         next if (defined($self->{option_results}->{filter_name}) && $self->{option_results}->{filter_name} ne ''
             && $application->{name} !~ /$self->{option_results}->{filter_name}/);
@@ -80,8 +75,11 @@ sub disco_format {
 sub disco_show {
     my ($self, %options) = @_;
 
-    $self->manage_selection(%options);
-    foreach my $application (@{$self->{data}}) {
+    my $result = $options{custom}->list_objects(api_type => 'arm', endpoint => '/applications');
+    foreach my $application (@{$result}) {
+        next if (defined($self->{option_results}->{filter_name}) && $self->{option_results}->{filter_name} ne ''
+            && $application->{name} !~ /$self->{option_results}->{filter_name}/);
+
         $self->{output}->add_disco_entry(
             id => $application->{id},
             name => $application->{name},

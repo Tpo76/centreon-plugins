@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -24,6 +24,7 @@ use base qw(centreon::plugins::templates::counter);
 
 use strict;
 use warnings;
+use Time::Local;
 
 sub custom_active_perfdata {
     my ($self, %options) = @_;
@@ -34,11 +35,17 @@ sub custom_active_perfdata {
         $total_options{cast_int} = 1;
     }
 
-    $self->{output}->perfdata_add(label => 'active_users',
-                                  value => $self->{result_values}->{active},
-                                  warning => $self->{perfdata}->get_perfdata_for_output(label => 'warning-' . $self->{label}, %total_options),
-                                  critical => $self->{perfdata}->get_perfdata_for_output(label => 'critical-' . $self->{label}, %total_options),
-                                  unit => 'users', min => 0, max => $self->{result_values}->{total});
+    $self->{result_values}->{report_date} =~ /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/;
+    $self->{output}->perfdata_add(label => 'perfdate', value => timelocal(0,0,12,$3,$2-1,$1-1900));
+
+    $self->{output}->perfdata_add(
+        label => 'active_users',
+        nlabel => 'skype.users.active.count',
+        value => $self->{result_values}->{active},
+        warning => $self->{perfdata}->get_perfdata_for_output(label => 'warning-' . $self->{thlabel}, %total_options),
+        critical => $self->{perfdata}->get_perfdata_for_output(label => 'critical-' . $self->{thlabel}, %total_options),
+        unit => 'users', min => 0, max => $self->{result_values}->{total}
+    );
 }
 
 sub custom_active_threshold {
@@ -48,22 +55,26 @@ sub custom_active_threshold {
     if ($self->{instance_mode}->{option_results}->{units} eq '%') {
         $threshold_value = $self->{result_values}->{prct_active};
     }
-    my $exit = $self->{perfdata}->threshold_check(value => $threshold_value,
-                                               threshold => [ { label => 'critical-' . $self->{label}, exit_litteral => 'critical' },
-                                                              { label => 'warning-' . $self->{label}, exit_litteral => 'warning' } ]);
+    my $exit = $self->{perfdata}->threshold_check(
+        value => $threshold_value,
+        threshold => [
+            { label => 'critical-' . $self->{thlabel}, exit_litteral => 'critical' },
+            { label => 'warning-' . $self->{thlabel}, exit_litteral => 'warning' }
+        ]
+    );
     return $exit;
-
 }
 
 sub custom_active_output {
     my ($self, %options) = @_;
 
-    my $msg = sprintf("Active users on %s : %d/%d (%.2f%%)",
-                        $self->{result_values}->{report_date},
-                        $self->{result_values}->{active},
-                        $self->{result_values}->{total},
-                        $self->{result_values}->{prct_active});
-    return $msg;
+    return sprintf(
+        "Active users on %s : %d/%d (%.2f%%)",
+        $self->{result_values}->{report_date},
+        $self->{result_values}->{active},
+        $self->{result_values}->{total},
+        $self->{result_values}->{prct_active}
+    );
 }
 
 sub custom_active_calc {
@@ -95,7 +106,7 @@ sub set_counters {
     $self->{maps_counters_type} = [
         { name => 'active', type => 0 },
         { name => 'global', type => 0, cb_prefix_output => 'prefix_global_output' },
-        { name => 'users', type => 1, cb_prefix_output => 'prefix_user_output', message_multiple => 'All users activity are ok' },
+        { name => 'users', type => 1, cb_prefix_output => 'prefix_user_output', message_multiple => 'All users activity are ok' }
     ];
     
     $self->{maps_counters}->{active} = [
@@ -108,63 +119,65 @@ sub set_counters {
             }
         },
     ];
+
     $self->{maps_counters}->{global} = [
-        { label => 'total-peer-to-peer-sessions', set => {
+        { label => 'total-peer-to-peer-sessions', nlabel => 'skype.users.sessions.p2p.total.count', set => {
                 key_values => [ { name => 'peer_to_peer_sessions' } ],
                 output_template => 'Peer-to-peer Sessions Count: %d',
                 perfdatas => [
-                    { label => 'total_peer_to_peer_sessions', value => 'peer_to_peer_sessions', template => '%d',
-                      min => 0 },
-                ],
+                    { label => 'total_peer_to_peer_sessions', template => '%d',
+                      min => 0 }
+                ]
             }
         },
-        { label => 'total-organized-conference', set => {
+        { label => 'total-organized-conference', nlabel => 'skype.users.conferences.organized.total.count', set => {
                 key_values => [ { name => 'organized_conference' } ],
                 output_template => 'Organized Conference Count: %d',
                 perfdatas => [
-                    { label => 'total_organized_conference', value => 'organized_conference', template => '%d',
-                      min => 0 },
-                ],
+                    { label => 'total_organized_conference', template => '%d',
+                      min => 0 }
+                ]
             }
         },
-        { label => 'total-participated-conference', set => {
+        { label => 'total-participated-conference', nlabel => 'skype.users.conferences.participated.total.count', set => {
                 key_values => [ { name => 'participated_conference' } ],
                 output_template => 'Participated Conference Count: %d',
                 perfdatas => [
-                    { label => 'total_participated_conference', value => 'participated_conference', template => '%d',
-                      min => 0 },
-                ],
+                    { label => 'total_participated_conference', template => '%d',
+                      min => 0 }
+                ]
             }
-        },
+        }
     ];
+
     $self->{maps_counters}->{users} = [
-        { label => 'peer-to-peer-sessions', set => {
+        { label => 'peer-to-peer-sessions', nlabel => 'skype.users.sessions.p2p.count', set => {
                 key_values => [ { name => 'peer_to_peer_sessions' }, { name => 'name' } ],
                 output_template => 'Peer-to-peer Sessions Count: %d',
                 perfdatas => [
-                    { label => 'peer_to_peer_sessions', value => 'peer_to_peer_sessions', template => '%d',
-                      min => 0, label_extra_instance => 1, instance_use => 'name' },
-                ],
+                    { label => 'peer_to_peer_sessions', template => '%d',
+                      min => 0, label_extra_instance => 1, instance_use => 'name' }
+                ]
             }
         },
-        { label => 'organized-conference', set => {
+        { label => 'organized-conference', nlabel => 'skype.users.conferences.organized.count', set => {
                 key_values => [ { name => 'organized_conference' }, { name => 'name' } ],
                 output_template => 'Organized Conference Count: %d',
                 perfdatas => [
-                    { label => 'organized_conference', value => 'organized_conference', template => '%d',
-                      min => 0, label_extra_instance => 1, instance_use => 'name' },
-                ],
+                    { label => 'organized_conference', template => '%d',
+                      min => 0, label_extra_instance => 1, instance_use => 'name' }
+                ]
             }
         },
-        { label => 'participated-conference', set => {
+        { label => 'participated-conference', nlabel => 'skype.users.conferences.participated.count', set => {
                 key_values => [ { name => 'participated_conference' }, { name => 'name' } ],
                 output_template => 'Participated Conference Count: %d',
                 perfdatas => [
-                    { label => 'participated_conference', value => 'participated_conference', template => '%d',
-                      min => 0, label_extra_instance => 1, instance_use => 'name' },
-                ],
+                    { label => 'participated_conference', template => '%d',
+                      min => 0, label_extra_instance => 1, instance_use => 'name' }
+                ]
             }
-        },
+        }
     ];
 }
 
@@ -176,7 +189,7 @@ sub new {
     $options{options}->add_options(arguments => {
         "filter-user:s"     => { name => 'filter_user' },
         "units:s"           => { name => 'units', default => '%' },
-        "filter-counters:s" => { name => 'filter_counters', default => 'active|total' }, 
+        "filter-counters:s" => { name => 'filter_counters', default => 'active|total' }
     });
 
     return $self;
@@ -189,22 +202,25 @@ sub manage_selection {
     $self->{global} = { peer_to_peer_sessions => 0, organized_conference => 0, participated_conference => 0 };
     $self->{users} = {};
 
-    my $results = $options{custom}->office_get_skype_activity();
+    my $results = $options{custom}->office_get_skype_activity(param => "period='D7'");
+    my $results_daily = [];
+    if (scalar(@{$results})) {
+       $self->{active}->{report_date} = @{$results}[0]->{'Report Refresh Date'};
+       $results_daily = $options{custom}->office_get_skype_activity(param => "date=" . $self->{active}->{report_date});
+    }
 
-    foreach my $user (@{$results}) {
-        $self->{active}->{report_date} = $user->{'Report Refresh Date'} if ($self->{active}->{report_date} eq '');
-
+    foreach my $user (@{$results}, @{$results_daily}) {
         if (defined($self->{option_results}->{filter_user}) && $self->{option_results}->{filter_user} ne '' &&
             $user->{'User Principal Name'} !~ /$self->{option_results}->{filter_user}/) {
             $self->{output}->output_add(long_msg => "skipping '" . $user->{'User Principal Name'} . "': no matching filter name.", debug => 1);
             next;
         }
     
-        $self->{active}->{total}++;
-
-        if (!defined($user->{'Last Activity Date'}) || $user->{'Last Activity Date'} eq '' ||
-            ($user->{'Last Activity Date'} ne $user->{'Report Refresh Date'})) {
-            $self->{output}->output_add(long_msg => "skipping '" . $user->{'User Principal Name'} . "': no activity.", debug => 1);
+        if ($user->{'Report Period'} != 1) {
+            if (!defined($user->{'Last Activity Date'}) || ($user->{'Last Activity Date'} ne $self->{active}->{report_date})) {
+                $self->{output}->output_add(long_msg => "skipping '" . $user->{'User Principal Name'} . "': no activity.", debug => 1);
+            }
+            $self->{active}->{total}++;
             next;
         }
 
@@ -227,7 +243,7 @@ __END__
 
 =head1 MODE
 
-Check users activity (reporting period over the last 7 days).
+Check users activity (reporting period over the last refreshed day).
 
 (See link for details about metrics :
 https://docs.microsoft.com/en-us/SkypeForBusiness/skype-for-business-online-reporting/activity-report)

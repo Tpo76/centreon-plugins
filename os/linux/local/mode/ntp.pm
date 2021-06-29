@@ -25,7 +25,7 @@ use base qw(centreon::plugins::templates::counter);
 use strict;
 use warnings;
 use centreon::plugins::misc;
-use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold);
+use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold_ng);
 
 my %state_map_ntpq = (
     '<sp>' => 'discarded due to high stratum and/or failed sanity checks',
@@ -71,12 +71,12 @@ my %unit_map_chronyc = (
 sub custom_status_output {
     my ($self, %options) = @_;
 
-    my $msg = sprintf("[type: %s] [reach: %s] [state: %s]",
+    return sprintf(
+        '[type: %s] [reach: %s] [state: %s]',
         $self->{result_values}->{type},
         $self->{result_values}->{reach},
         $self->{result_values}->{state}
     );
-    return $msg;
 }
 
 sub custom_status_calc {
@@ -84,13 +84,13 @@ sub custom_status_calc {
 
     $self->{result_values}->{rawtype} = $options{new_datas}->{$self->{instance} . '_type'};
     $self->{result_values}->{rawstate} = $options{new_datas}->{$self->{instance} . '_state'};
-    if ($self->{instance_mode}->{option_results}->{command} eq 'ntpq') {
+    if ($self->{instance_mode}->{command} eq 'ntpq') {
         $self->{result_values}->{type} = $type_map_ntpq{$options{new_datas}->{$self->{instance} . '_type'}};
     } else {
         $self->{result_values}->{type} = $type_map_chronyc{$options{new_datas}->{$self->{instance} . '_type'}};
     }
     $self->{result_values}->{reach} = $options{new_datas}->{$self->{instance} . '_reach'};
-    if ($self->{instance_mode}->{option_results}->{command} eq 'ntpq') {
+    if ($self->{instance_mode}->{command} eq 'ntpq') {
         $self->{result_values}->{state} = $state_map_ntpq{$options{new_datas}->{$self->{instance} . '_state'}};
     } else {
         $self->{result_values}->{state} = $state_map_chronyc{$options{new_datas}->{$self->{instance} . '_state'}};
@@ -142,20 +142,19 @@ sub set_counters {
                 key_values => [ { name => 'peers' } ],
                 output_template => 'Number of ntp peers : %d',
                 perfdatas => [
-                    { label => 'peers', value => 'peers', template => '%d',
-                      min => 0 },
-                ],
+                    { label => 'peers', template => '%d', min => 0 }
+                ]
             }
-        },
+        }
     ];
 
     $self->{maps_counters}->{peers} = [
-        { label => 'status', threshold => 0, set => {
+        { label => 'status', type => 2, set => {
                 key_values => [ { name => 'state' }, { name => 'type' }, { name => 'reach' }, { name => 'display' } ],
                 closure_custom_calc => $self->can('custom_status_calc'),
                 closure_custom_output => $self->can('custom_status_output'),
                 closure_custom_perfdata => sub { return 0; },
-                closure_custom_threshold_check => \&catalog_status_threshold,
+                closure_custom_threshold_check => \&catalog_status_threshold_ng
             }
         },
         { label => 'offset', display_ok => 0, set => {
@@ -164,20 +163,18 @@ sub set_counters {
                 closure_custom_threshold_check => $self->can('custom_offset_threshold'),
                 closure_custom_perfdata => $self->can('custom_offset_perfdata'),
                 perfdatas => [
-                    { label => 'offset', value => 'offset', template => '%s',
-                      min => 0, unit => 'ms', label_extra_instance => 1, instance_use => 'display' },
-                ],
+                    { label => 'offset', template => '%s', min => 0, unit => 'ms', label_extra_instance => 1, instance_use => 'display' }
+                ]
             }
         },
         { label => 'stratum', display_ok => 0, set => {
                 key_values => [ { name => 'stratum' }, { name => 'display' } ],
                 output_template => 'Stratum : %s',
                 perfdatas => [
-                    { label => 'stratum', value => 'stratum', template => '%s',
-                      min => 0, label_extra_instance => 1, instance_use => 'display' },
-                ],
+                    { label => 'stratum', template => '%s', min => 0, label_extra_instance => 1, instance_use => 'display' }
+                ]
             }
-        },
+        }
     ];
 }
 
@@ -193,21 +190,9 @@ sub new {
     bless $self, $class;
 
     $options{options}->add_options(arguments => {
-        "hostname:s"        => { name => 'hostname' },
-        "remote"            => { name => 'remote' },
-        "ssh-option:s@"     => { name => 'ssh_option' },
-        "ssh-path:s"        => { name => 'ssh_path' },
-        "ssh-command:s"     => { name => 'ssh_command', default => 'ssh' },
-        "timeout:s"         => { name => 'timeout', default => 30 },
-        "sudo"              => { name => 'sudo' },
-        "command:s"         => { name => 'command', default => 'ntpq' },
-        "command-path:s"    => { name => 'command_path' },
-        "command-options:s" => { name => 'command_options', default => '' },
-        "filter-name:s"     => { name => 'filter_name' },
-        "filter-state:s"    => { name => 'filter_state' },
-        "unknown-status:s"  => { name => 'unknown_status', default => '' },
-        "warning-status:s"  => { name => 'warning_status', default => '' },
-        "critical-status:s" => { name => 'critical_status', default => '' },
+        'ntp-mode:s'     => { name => 'ntp_mode', default => 'ntpq' },
+        'filter-name:s'  => { name => 'filter_name' },
+        'filter-state:s' => { name => 'filter_state' }
     });
 
     return $self;
@@ -217,30 +202,26 @@ sub check_options {
     my ($self, %options) = @_;
     $self->SUPER::check_options(%options);
 
-    if ($self->{option_results}->{command} eq 'ntpq') {
+    if ($self->{option_results}->{ntp_mode} eq 'ntpq') {
         $self->{regex} = '^(\+|\*|\.|\-|\#|x|\<sp\>|o)(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)';
-        $self->{option_results}->{command_options} = '-p -n 2>&1';
-    } elsif ($self->{option_results}->{command} eq 'chronyc') {
+        $self->{command} = 'ntpq';
+        $self->{command_options} = '-p -n 2>&1';
+    } elsif ($self->{option_results}->{ntp_mode} eq 'chronyc') {
         $self->{regex} = '^(.)(\+|\*|\.|\-|\#|x|\<sp\>)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*?)(\d+)(\w+)$';
-        $self->{option_results}->{command_options} = '-n sources 2>&1';
+        $self->{command} = 'chronyc';
+        $self->{command_options} = '-n sources 2>&1';
     } else {
-        $self->{output}->add_option_msg(short_msg => "command '" . $self->{option_results}->{command} . "' not implemented" );
+        $self->{output}->add_option_msg(short_msg => "ntp mode '" . $self->{option_results}->{ntp_mode} . "' not implemented" );
         $self->{output}->option_exit();
-    }
-    
-    $self->change_macros(macros => ['unknown_status', 'warning_status', 'critical_status']);
+    }    
 }
 
 sub manage_selection {
     my ($self, %options) = @_;
-    
-    my $stdout = centreon::plugins::misc::execute(
-        output => $self->{output},
-        options => $self->{option_results},
-        sudo => $self->{option_results}->{sudo},
-        command => $self->{option_results}->{command},
-        command_path => $self->{option_results}->{command_path},
-        command_options => $self->{option_results}->{command_options},
+
+    my ($stdout) = $options{custom}->execute_command(
+        command => $self->{command},
+        command_options => $self->{command_options}
     );
     
     $self->{global} = { peers => 0 };
@@ -255,7 +236,7 @@ sub manage_selection {
         next if ($line !~ /$self->{regex}/);
         
         my ($remote_peer, $peer_fate) = (centreon::plugins::misc::trim($2), centreon::plugins::misc::trim($1));
-        if ($self->{option_results}->{command} eq 'chronyc') {
+        if ($self->{command} eq 'chronyc') {
             $remote_peer = centreon::plugins::misc::trim($3);
             $peer_fate = centreon::plugins::misc::trim($2);
         }
@@ -270,7 +251,7 @@ sub manage_selection {
             next;
         }
         
-        if ($self->{option_results}->{command} eq 'ntpq') {
+        if ($self->{command} eq 'ntpq') {
             my ($refid, $stratum, $type, $last_time, $polling_intervall, $reach, $delay, $offset, $jitter) = ($3, $4, $5, $6, $7, $8, $9, $10, $11);
             $self->{peers}->{$remote_peer} = {
                 display => $remote_peer,
@@ -280,7 +261,7 @@ sub manage_selection {
                 reach   => centreon::plugins::misc::trim($reach),
                 offset  => centreon::plugins::misc::trim($offset)
             };
-        } elsif ($self->{option_results}->{command} eq 'chronyc') {
+        } elsif ($self->{command} eq 'chronyc') {
             #210 Number of sources = 4
             #MS Name/IP address         Stratum Poll Reach LastRx Last sample               
             #===============================================================================
@@ -310,50 +291,19 @@ __END__
 
 Check ntp daemons.
 
+Command used: 'ntpq -p -n 2>&1' or 'chronyc -n sources 2>&1'
+
 =over 8
 
-=item B<--remote>
+=item B<--ntp-mode>
 
-Execute command remotely in 'ssh'.
-
-=item B<--hostname>
-
-Hostname to query (need --remote).
-
-=item B<--ssh-option>
-
-Specify multiple options like the user (example: --ssh-option='-l=centreon-engine' --ssh-option='-p=52').
-
-=item B<--ssh-path>
-
-Specify ssh command path (default: none)
-
-=item B<--ssh-command>
-
-Specify ssh command (default: 'ssh'). Useful to use 'plink'.
-
-=item B<--timeout>
-
-Timeout in seconds for the command (Default: 30).
-
-=item B<--sudo>
-
-Use 'sudo' to execute the command.
-
-=item B<--command>
-
-Command to get information (Default: 'ntpq').
-Can also be 'chronyc'.
-
-=item B<--command-path>
-
-Command path (Default: none).
+Default mode for parsing and command: 'ntpq' (default) or 'chronyc'.
 
 =item B<--filter-name>
 
 Filter peer name (can be a regexp).
 
-=item B<--filter-name>
+=item B<--filter-state>
 
 Filter peer state (can be a regexp).
 

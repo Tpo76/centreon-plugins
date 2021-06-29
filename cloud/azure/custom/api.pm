@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -55,13 +55,12 @@ sub new {
             'interval:s'            => { name => 'interval' },
             'aggregation:s@'        => { name => 'aggregation' },
             'zeroed'                => { name => 'zeroed' },
-            'timeout:s'             => { name => 'timeout' },
+            'timeout:s'             => { name => 'timeout' }
         });
     }
     $options{options}->add_help(package => __PACKAGE__, sections => 'REST API OPTIONS', once => 1);
 
     $self->{output} = $options{output};
-    $self->{mode} = $options{mode};
     $self->{http} = centreon::plugins::http->new(%options);
     $self->{cache} = centreon::plugins::statefile->new(%options);
 
@@ -74,21 +73,7 @@ sub set_options {
     $self->{option_results} = $options{option_results};
 }
 
-sub set_defaults {
-    my ($self, %options) = @_;
-
-    foreach (keys %{$options{default}}) {
-        if ($_ eq $self->{mode}) {
-            for (my $i = 0; $i < scalar(@{$options{default}->{$_}}); $i++) {
-                foreach my $opt (keys %{$options{default}->{$_}[$i]}) {
-                    if (!defined($self->{option_results}->{$opt}[$i])) {
-                        $self->{option_results}->{$opt}[$i] = $options{default}->{$_}[$i]->{$opt};
-                    }
-                }
-            }
-        }
-    }
-}
+sub set_defaults {}
 
 sub check_options {
     my ($self, %options) = @_;
@@ -174,20 +159,18 @@ sub get_access_token {
     my $access_token = $options{statefile}->get(name => 'access_token');
 
     if ($has_cache_file == 0 || !defined($access_token) || (($expires_on - time()) < 10)) {
-        my $uri = URI::Encode->new({encode_reserved => 1});
-        my $encoded_management_endpoint = $uri->encode($self->{management_endpoint});
-        my $post_data = 'grant_type=client_credentials' . 
-            '&client_id=' . $self->{client_id} .
-            '&client_secret=' . $self->{client_secret} .
-            '&resource=' . $encoded_management_endpoint;
-        
         $self->settings();
 
         my $content = $self->{http}->request(
-            method => 'POST', query_form_post => $post_data,
+            method => 'POST',
             full_url => $self->{login_endpoint} . '/' . $self->{tenant} . '/oauth2/token',
             hostname => '',
-            header => [ 'Content-Type: application/x-www-form-urlencoded' ]
+            post_param => [
+                'grant_type=client_credentials',
+                'client_id=' . $self->{client_id},
+                'client_secret=' . $self->{client_secret},
+                'resource=' . $self->{management_endpoint}
+            ]
         );
 
         if (!defined($content) || $content eq '' || $self->{http}->get_header(name => 'content-length') == 0) {
@@ -296,6 +279,7 @@ sub azure_get_metrics_set_url {
         "&metricnames=" . $encoded_metrics . "&aggregation=" . $encoded_aggregations .
         "&timespan=" . $encoded_timespan . "&interval=" . $options{interval};
     $url .= "&\$filter=" . $options{dimension} if defined($options{dimension});
+    $url .= "&metricnamespace=" . $uri->encode($options{metric_namespace}) if defined($options{metric_namespace});
 
     return $url;
 }
@@ -335,6 +319,9 @@ sub azure_get_metrics {
                     $results->{$metric_name}->{total} += $point->{total};
                     $results->{$metric_name}->{points}++;
                 }
+                if (defined($point->{count})) {
+                    $results->{$metric_name}->{count} = $point->{count};
+                }
             }
         }
 
@@ -351,7 +338,7 @@ sub azure_get_resource_health_set_url {
 
     my $url = $self->{management_endpoint} . "/subscriptions/" . $self->{subscription} . "/resourceGroups/" .
         $options{resource_group} . "/providers/" . $options{resource_namespace} . "/" . $options{resource_type} .
-        "/" . $options{resource} . "/providers/Microsoft.ResourceHealth/availabilityStatuses/current?api-version=" . $self->{api_version};
+        "/" . $options{resource} . "/providers/Microsoft.ResourceHealth/availabilityStatuses/current?api-version=" . $options{api_version};
 
     return $url;
 }
@@ -642,8 +629,10 @@ sub azure_get_log_analytics_set_url {
 
     my $uri = URI::Encode->new({encode_reserved => 1});
     my $encoded_query = $uri->encode($options{query});
-    my $encoded_interval = $uri->encode($options{interval});
-    my $url = $self->{management_endpoint} . '/v1/workspaces/' . $options{workspace_id} . '/query?query=' . $encoded_query . '&timespan=' . $encoded_interval;
+    my $encoded_timespan = $uri->encode($options{timespan});
+    my $url = $self->{management_endpoint} . '/v1/workspaces/' . $options{workspace_id} . '/query?query=' . $encoded_query;
+    $url .= '&timespan=' . $encoded_timespan if (defined($encoded_timespan));
+    $url .= '&api-version=' . $self->{api_version};
 
     return $url;
 }
@@ -652,6 +641,26 @@ sub azure_get_log_analytics {
     my ($self, %options) = @_;
 
     my $full_url = $self->azure_get_log_analytics_set_url(%options);
+    my $response = $self->request_api(method => 'GET', full_url => $full_url, hostname => '');
+
+    return $response;
+}
+
+sub azure_get_publicip_set_url {
+    my ($self, %options) = @_;
+
+    my $url = $self->{management_endpoint} . "/subscriptions/" . $self->{subscription};
+    $url .= "/resourceGroups/" . $options{resource_group} if (defined($options{resource_group}) && $options{resource_group} ne '');
+    $url .= "/providers/Microsoft.Network/publicIPAddresses/" . $options{resource} if (defined($options{resource}) && $options{resource} ne '');
+    $url .= "?api-version=" . $self->{api_version};
+
+    return $url;
+}
+
+sub azure_get_publicip {
+    my ($self, %options) = @_;
+
+    my $full_url = $self->azure_get_publicip_set_url(%options);
     my $response = $self->request_api(method => 'GET', full_url => $full_url, hostname => '');
 
     return $response;
@@ -715,7 +724,7 @@ Set interval of the metric query (Can be : PT1M, PT5M, PT15M, PT30M, PT1H, PT6H,
 
 =item B<--aggregation>
 
-Set monitor aggregation (Can be multiple, Can be: 'minimum', 'maximum', 'average', 'total').
+Set monitor aggregation (Can be multiple, Can be: 'minimum', 'maximum', 'average', 'total', 'count').
 
 =item B<--zeroed>
 

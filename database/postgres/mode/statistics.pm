@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -201,14 +201,14 @@ Check database statistics: commit, rollback, insert, delete, update.
 =item B<--warning-*>
 
 Threshold warning.
-Can be: 'total-*', 'total-*', '*', The '*' can be: 'commit', 'rollback', 'insert', 'delete', 'update'.
-Examples: --warning-total-commit='', --warning-delete='', --warning-total-rollback=''
+Can be: 'commit', 'rollback', 'insert', 'delete', 'update',
+'total-commit', 'total-rollback', 'total-insert', 'total-delete', 'total-update'.
 
 =item B<--critical-*>
 
 Threshold critical.
-Can be: 'total-*', 'total-*', '*', The '*' can be: 'commit', 'rollback', 'insert', 'delete', 'update'.
-Examples: --warning-total-commit='', --warning-delete='', --warning-total-rollback=''
+Can be: 'commit', 'rollback', 'insert', 'delete', 'update',
+'total-commit', 'total-rollback', 'total-insert', 'total-delete', 'total-update'.
 
 =item B<--filter-database>
 

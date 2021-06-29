@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -49,22 +49,29 @@ sub set_counters {
                 key_values => [ { name => 'offset' }, { name => 'date' } ],
                 closure_custom_output => $self->can('custom_usage_output'),
                 perfdatas => [
-                    { label => 'offset', value => 'offset', template => '%d', unit => 's' },
-                ],
+                    { label => 'offset', template => '%d', unit => 's' }
+                ]
             }
-        },
+        }
     ];
+}
+
+sub default_date_oid {
+    my ($self, %options) = @_;
+
+    return '.1.3.6.1.2.1.25.1.2.0';
 }
 
 sub new {
     my ($class, %options) = @_;
     my $self = $class->SUPER::new(package => __PACKAGE__, %options);
     bless $self, $class;
-    
-    $options{options}->add_options(arguments => { 
+
+    $options{options}->add_options(arguments => {
+        'oid:s'          => { name => 'oid' },
         'ntp-hostname:s' => { name => 'ntp_hostname' },
         'ntp-port:s'     => { name => 'ntp_port', default => 123 },
-        'timezone:s'     => { name => 'timezone' },
+        'timezone:s'     => { name => 'timezone' }
     });
 
     return $self;
@@ -82,70 +89,101 @@ sub check_options {
     }
 }
 
-sub get_target_time {
+sub get_from_epoch {
     my ($self, %options) = @_;
 
-    my $oid_hrSystemDate = '.1.3.6.1.2.1.25.1.2.0';
-    my $result = $options{snmp}->get_leef(oids => [ $oid_hrSystemDate ], nothing_quit => 1);
+    my $timezone = 'UTC';
+    if (defined($self->{option_results}->{timezone}) && $self->{option_results}->{timezone} ne '') {
+        $timezone = $self->{option_results}->{timezone};
+    }
 
-    my @remote_date = unpack 'n C6 a C2', $result->{$oid_hrSystemDate};
+    my $tz = centreon::plugins::misc::set_timezone(name => $timezone);
+    my $dt = DateTime->from_epoch(
+        epoch => $options{date},
+        %$tz
+    );
+    my @remote_date = ($dt->year, $dt->month, $dt->day, $dt->hour, $dt->minute, $dt->second);
+    return ($dt->epoch, \@remote_date, $timezone);
+}
+
+sub get_from_datetime {
+    my ($self, %options) = @_;
+
+    my @remote_date = unpack('n C6 a C2', $options{date});
     my $timezone = 'UTC';
     if (defined($self->{option_results}->{timezone}) && $self->{option_results}->{timezone} ne '') {
         $timezone = $self->{option_results}->{timezone};
     } elsif (defined($remote_date[9])) {
-        $timezone = sprintf("%s%02d%02d", $remote_date[7], $remote_date[8], $remote_date[9]); # format +0630
+        $timezone = sprintf('%s%02d%02d', $remote_date[7], $remote_date[8], $remote_date[9]); # format +0630
     }
 
     my $tz = centreon::plugins::misc::set_timezone(name => $timezone);
     my $dt = DateTime->new(
-      year       => $remote_date[0],
-      month      => $remote_date[1],
-      day        => $remote_date[2],
-      hour       => $remote_date[3],
-      minute     => $remote_date[4],
-      second     => $remote_date[5],
-      %$tz
+        year       => $remote_date[0],
+        month      => $remote_date[1],
+        day        => $remote_date[2],
+        hour       => $remote_date[3],
+        minute     => $remote_date[4],
+        second     => $remote_date[5],
+        %$tz
     );
 
     return ($dt->epoch, \@remote_date, $timezone);
 }
 
+sub get_target_time {
+    my ($self, %options) = @_;
+
+    my $oid_date = $self->default_date_oid();
+    if (defined($self->{option_results}->{oid}) && $self->{option_results}->{oid} ne '') {
+        $oid_date = $self->{option_results}->{oid};
+    }
+    my $result = $options{snmp}->get_leef(oids => [ $oid_date ], nothing_quit => 1);
+
+    if ($result->{$oid_date} =~ /^[0-9]{10}$/) {
+        return $self->get_from_epoch(date => $result->{$oid_date});
+    }
+
+    return $self->get_from_datetime(date => $result->{$oid_date});
+}
+
 sub manage_selection {
     my ($self, %options) = @_;
 
-    my ($disant_time, $remote_date, $timezone) = $self->get_target_time(%options);
+    my ($distant_time, $remote_date, $timezone) = $self->get_target_time(%options);
+    if ($distant_time == 0) {
+        $self->{output}->add_option_msg(short_msg => "Couldn't get system date: local time: 0");
+        $self->{output}->option_exit();
+    }
+
     my $ref_time;
     if (defined($self->{option_results}->{ntp_hostname}) && $self->{option_results}->{ntp_hostname} ne '') {
         my %ntp;
-        
+
         eval {
             %ntp = Net::NTP::get_ntp_response($self->{option_results}->{ntp_hostname}, $self->{option_results}->{ntp_port});
         };
         if ($@) {
-            $self->{output}->output_add(
-                severity => 'UNKNOWN',
-                short_msg => "Couldn't connect to ntp server: " . $@
-            );
-            $self->{output}->display();
-            $self->{output}->exit();
+            $self->{output}->add_option_msg(short_msg => "Couldn't connect to ntp server: " . $@);
+            $self->{output}->option_exit();
         }
-        
+
         $ref_time = $ntp{'Transmit Timestamp'};
     } else {
         $ref_time = time();
     }
 
-    my $offset = $disant_time - $ref_time;
+    my $offset = $distant_time - $ref_time;
     my $remote_date_formated = sprintf(
         'Local Time : %02d-%02d-%02dT%02d:%02d:%02d (%s)',
         $remote_date->[0], $remote_date->[1], $remote_date->[2],
         $remote_date->[3], $remote_date->[4], $remote_date->[5], $timezone
     );
 
-    $self->{offset} = { 
-        offset => sprintf("%d", $offset),
-        date => $remote_date_formated,
-    };    
+    $self->{offset} = {
+        offset => sprintf('%d', $offset),
+        date => $remote_date_formated
+    };
 }
 
 1;
@@ -159,6 +197,10 @@ SNMP gives a date with second precision (no milliseconds). Time precision is not
 Use threshold with (+-) 2 seconds offset (minimum).
 
 =over 8
+
+=item B<--oid>
+
+Override default OID.
 
 =item B<--warning-offset>
 

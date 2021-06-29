@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -147,7 +147,9 @@ sub configure_varnish_stats {
         { entry => 'n_wrk_max', nlabel => 'workers.threads.limited.count', display_ok => 0, diff => 1 },
         { entry => 'n_wrk_lqueue', nlabel => 'workers.requests.queue.length.count', display_ok => 0, diff => 1 },
         { entry => 'n_wrk_queued', nlabel => 'workers.requests.queued.count', display_ok => 0, diff => 1 },
-        { entry => 'n_wrk_drop', nlabel => 'workers.requests.dropped.count', display_ok => 0, diff => 1 }
+        { entry => 'n_wrk_drop', nlabel => 'workers.requests.dropped.count', display_ok => 0, diff => 1 },
+
+        { entry => 's0.g_space', category => 'SMA', nlabel => 'storage.space.free.bytes', display_ok => 0, custom_output => $self->can('custom_output_scale_bytes') },
     ];
 }
 
@@ -165,8 +167,7 @@ sub custom_output_second {
 
     my $label = $self->{label};
     $label =~ s/-/_/g;
-    my $msg = sprintf('%s: %.2f/s', $self->{result_values}->{$label . '_description'},  $self->{result_values}->{$label});
-    return $msg;
+    return sprintf('%s: %.2f/s', $self->{result_values}->{$label . '_description'},  $self->{result_values}->{$label});
 }
 
 sub custom_output { 
@@ -174,8 +175,7 @@ sub custom_output {
 
     my $label = $self->{label};
     $label =~ s/-/_/g;
-    my $msg = sprintf('%s: %s', $self->{result_values}->{$label . '_description'},  $self->{result_values}->{$label });
-    return $msg;
+    return sprintf('%s: %s', $self->{result_values}->{$label . '_description'},  $self->{result_values}->{$label});
 }
 
 sub set_counters {
@@ -199,8 +199,8 @@ sub set_counters {
                     perfdatas => [
                         { label => $_->{entry}, 
                           template => defined($_->{per_second}) ? '%.2f' : '%s',
-                          min => 0 },
-                    ],
+                          min => 0 }
+                    ]
                 }
             }
         ;
@@ -213,16 +213,6 @@ sub new {
     bless $self, $class;
 
     $options{options}->add_options(arguments => {
-        'hostname:s'         => { name => 'hostname' },
-        'remote'             => { name => 'remote' },
-        'ssh-option:s@'      => { name => 'ssh_option' },
-        'ssh-path:s'         => { name => 'ssh_path' },
-        'ssh-command:s'      => { name => 'ssh_command', default => 'ssh' },
-        'timeout:s'          => { name => 'timeout', default => 30 },
-        'sudo'               => { name => 'sudo' },
-        'command:s'          => { name => 'command', default => 'varnishstat' },
-        'command-path:s'     => { name => 'command_path', default => '/usr/bin' },
-        'command-options:s'  => { name => 'command_options', default => ' -1 -j 2>&1' }
     });
 
     return $self;
@@ -232,40 +222,43 @@ sub check_varnish_old {
     my ($self, %options) = @_;
 
     return if (!defined($options{json}->{uptime}));
-     #   "cache_hit": {"value": 56320, "flag": "a", "description": "Cache hits"},
-     #   "cache_hitpass": {"value": 0, "flag": "a", "description": "Cache hits for pass"},
+    #   "cache_hit": {"value": 56320, "flag": "a", "description": "Cache hits"},
+    #   "cache_hitpass": {"value": 0, "flag": "a", "description": "Cache hits for pass"},
+    #   "SMA.s0.g_space": {"type": "SMA", "ident": "s0", "value": 2147483648, "flag": "i", "description": "Bytes available"},
     foreach (@{$self->{varnish_stats}}) {
-        next if (!defined($options{json}->{$_->{entry}}));
-        $self->{global}->{$_->{entry}} = $options{json}->{$_->{entry}}->{value};
-        $self->{global}->{$_->{entry} . '_description'} = $options{json}->{$_->{entry}}->{description};
+        my $entry = defined($_->{category}) ? $_->{category} . '.' . $_->{entry} : $_->{entry};
+        next if (!defined($options{json}->{$entry}));
+        $self->{global}->{$_->{entry}} = $options{json}->{$entry}->{value};
+        $self->{global}->{$_->{entry} . '_description'} = $options{json}->{$entry}->{description};
     }
 }
 
 sub check_varnish_new {
     my ($self, %options) = @_;
 
-    return if (!defined($options{json}->{'MAIN.uptime'}));
+    my $counters = $options{json};
+    $counters = $counters->{counters} if (defined($counters->{counters})); # since varnish 6.6.x
+    return if (!defined($counters->{'MAIN.uptime'}));
 
     #   "MAIN.cache_hit": {"type": "MAIN", "value": 18437, "flag": "a", "description": "Cache hits"},
     #   "MAIN.cache_hitpass": {"type": "MAIN", "value": 3488, "flag": "a", "description": "Cache hits for pass"},
     #   "MAIN.cache_miss": {"type": "MAIN", "value": 5782, "flag": "a", "description": "Cache misses"},
+    #   "SMA.s0.g_space": { "description": "Bytes available", "flag": "g", "format": "B", "value": 4244053932 },
     foreach (@{$self->{varnish_stats}}) {
-        next if (!defined($options{json}->{'MAIN.' . $_->{entry}}));
-        $self->{global}->{$_->{entry}} = $options{json}->{'MAIN.' . $_->{entry}}->{value};
-        $self->{global}->{$_->{entry} . '_description'} = $options{json}->{'MAIN.' . $_->{entry}}->{description};
+        my $category = defined($_->{category}) ? $_->{category} : 'MAIN';
+        next if (!defined($counters->{ $category . '.' . $_->{entry} }));
+        $self->{global}->{$_->{entry}} = $counters->{ $category . '.' . $_->{entry} }->{value};
+        $self->{global}->{$_->{entry} . '_description'} = $counters->{ $category . '.' . $_->{entry} }->{description};
     }
 }
 
 sub manage_selection {
     my ($self, %options) = @_;
 
-    my ($stdout) = centreon::plugins::misc::execute(
-        output => $self->{output},
-        options => $self->{option_results},
-        sudo => $self->{option_results}->{sudo},
-        command => $self->{option_results}->{command},
-        command_path => $self->{option_results}->{command_path},
-        command_options => $self->{option_results}->{command_options}
+    my ($stdout) = $options{custom}->execute_command(
+        command => 'varnishstat',
+        command_path => '/usr/bin',
+        command_options => '-1 -j 2>&1'
     );
 
     $self->{global} = {};
@@ -282,7 +275,7 @@ sub manage_selection {
     $self->check_varnish_old(json => $content);
     $self->check_varnish_new(json => $content);
 
-    $self->{cache_name} = "cache_varnish_" . $self->{mode} . '_' .
+    $self->{cache_name} = 'cache_varnish_' . $self->{mode} . '_' .
         (defined($self->{option_results}->{hostname}) ? md5_hex($self->{option_results}->{hostname}) : md5_hex('all')) . '_' .
         (defined($self->{option_results}->{filter_counters}) ? md5_hex($self->{option_results}->{filter_counters}) : md5_hex('all'));
 };
@@ -294,33 +287,11 @@ __END__
 
 =head1 MODE
 
-Check statistics with varnishstat command
+Check statistics with varnishstat command.
+
+Command used: /usr/bin/varnishstat -1 -j 2>&1
 
 =over 8
-
-=item B<--remote>
-
-If you dont run this script locally, if you wanna use it remote, you can run it remotely with 'ssh'.
-
-=item B<--hostname>
-
-Hostname to query (need --remote).
-
-=item B<--ssh-option>
-
-Specify multiple options like the user (example: --ssh-option='-l=centreon-engine' --ssh-option='-p=52').
-
-=item B<--command>
-
-Varnishstat Binary Filename (Default: varnishstat)
-
-=item B<--command-path>
-
-Directory Path to Varnishstat Binary File (Default: /usr/bin)
-
-=item B<--command-options>
-
-Parameter for Binary File (Default: ' -1 -j 2>&1')
 
 =item B<--warning-[countername]> B<--critical-[countername]>
 

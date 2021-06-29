@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -132,10 +132,11 @@ sub manage_selection {
     );
     $snmp_result = $options{snmp}->get_leef();
 
-    my ($total, $used, $cached, $buffer);
+    my ($total, $used, $cached, $buffer, $unavailable);
     #.1.3.6.1.2.1.25.2.3.1.3.1 = STRING: RAM
     #.1.3.6.1.2.1.25.2.3.1.3.2 = STRING: RAM (Buffers)
     #.1.3.6.1.2.1.25.2.3.1.3.3 = STRING: RAM (Cache)
+    #.1.3.6.1.2.1.25.2.3.1.3.100 = STRING: RAM (Unavailable)
     foreach (@$storages) {
         my $result = $options{snmp}->map_instance(mapping => $mapping, results => $snmp_result, instance => $_);
         my $current = $result->{hrStorageUsed} * $result->{hrStorageAllocationUnits};
@@ -145,13 +146,19 @@ sub manage_selection {
             $cached = $current;
         } elsif ($result->{hrStorageDescr} =~ /RAM.*?Buffers/i) {
             $buffer = $current;
+        } elsif ($result->{hrStorageDescr} =~ /RAM.*?Unavailable/i) {
+            $unavailable = $current;
         } elsif ($result->{hrStorageDescr} =~ /RAM/i) {
             $used = $current;
             $total = $result->{hrStorageSize} * $result->{hrStorageAllocationUnits};
         }
     }
 
-    $used -= (defined($cached) ? $cached : 0) - (defined($buffer) ? $buffer : 0);
+    if (defined($unavailable)) {
+        $used = $unavailable;
+    } else {
+        $used -= (defined($cached) ? $cached : 0) - (defined($buffer) ? $buffer : 0);
+    }
     $self->{ram} = {
         total => $total,
         cached => $cached,

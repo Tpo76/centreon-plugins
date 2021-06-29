@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -27,9 +27,7 @@ use warnings;
 
 sub set_system {
     my ($self, %options) = @_;
-        
-    $self->{regexp_threshold_overload_check_section_option} =
-        '^(?:ad|aic|aoc|camera|st|software|temperature|vic|vis|voc|webex)';
+
     $self->{regexp_threshold_numeric_check_section_option} = '^(?:aiclatency|aocdelay)$';
 
     $self->{cb_hook2} = 'execute_custom';
@@ -38,33 +36,35 @@ sub set_system {
         connection_status => [
             ['NotConnected', 'OK'],
             ['Connected', 'OK'],
-            ['Unknown', 'UNKNOWN'],
+            ['Unknown', 'UNKNOWN']
         ],
         connected => [
             ['True', 'OK'],
             ['False', 'WARNING'],
-            ['Unknown', 'UNKNOWN'],
+            ['Unknown', 'UNKNOWN']
         ],
         temperature => [
+            ['n/a', 'OK'],
             ['Normal', 'OK'],
-            ['.*', 'CRITICAL'],
+            ['.*', 'CRITICAL']
         ],
         software_status => [
             ['None', 'OK'],
             ['InProgress', 'OK'],
             ['InstallationFailed', 'CRITICAL'],
             ['Failed', 'CRITICAL'],
-            ['Succeeded', 'OK'],
+            ['Succeeded', 'OK']
         ],
         software_urgency => [
+            ['n/a', 'OK'],
             ['Low', 'OK'],
             ['Medium', 'OK'],
-            ['Critical', 'CRITICAL'],
+            ['Critical', 'CRITICAL']
         ],
         signal_state => [
             ['OK', 'OK'],
             ['Unsupported', 'WARNING'],
-            ['Unknown', 'UNKNOWN'],
+            ['Unknown', 'UNKNOWN']
         ],
         format_status => [
             ['Ok', 'OK'],
@@ -72,24 +72,24 @@ sub set_system {
             ['NotFound', 'OK'],
             ['Error', 'CRITICAL'],
             ['Interlaced', 'OK'],
-            ['Unknown', 'UNKNOWN'],
+            ['Unknown', 'UNKNOWN']
         ],
         webex => [
             ['Disabled', 'OK'],
             ['Stopped', 'OK'],
             ['Error', 'CRITICAL'],
             ['Registered', 'OK'],
-            ['Registering', 'OK'],
+            ['Registering', 'OK']
         ],
         st_status => [
             ['Inactive', 'WARNING'],
-            ['Active', 'OK'],
+            ['Active', 'OK']
         ],
         st_availability => [
             ['Unavailable', 'WARNING'],
             ['Available', 'OK'],
-            ['Off', 'OK'],
-        ],
+            ['Off', 'OK']
+        ]
     };
 
     $self->{components_exec_load} = 0;
@@ -118,6 +118,11 @@ sub execute_custom {
         url_path => '/status.xml',
         ForceArray => ['Microphone', 'HDMI', 'Line', 'InternalSpeaker', 'Camera', 'Connector', 'Source']
     );
+
+    my $system_version = 'unknown';
+    $system_version = $self->{results}->{version} if (defined($self->{results}->{version}));
+
+    $self->{output}->output_add(long_msg => 'firmware version: ' . $system_version);
 }
 
 1;

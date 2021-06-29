@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -196,13 +196,13 @@ Set resource group (Required if resource's name is used).
 Set resource namespace (Can be: 'Blob', 'File', 'Table', 'Queue').
 Leave empty for account metric.
 
-=item B<--warning-availability-$aggregation$>
+=item B<--warning-availability-*>
 
-Thresholds warning ($aggregation$ can be: 'minimum', 'maximum', 'average').
+Thresholds warning (* can be: 'minimum', 'maximum', 'average').
 
-=item B<--critical-availability-$aggregation$>
+=item B<--critical-availability-*>
 
-Thresholds critical ($aggregation$ can be: 'minimum', 'maximum', 'average').
+Thresholds critical (* can be: 'minimum', 'maximum', 'average').
 
 =back
 

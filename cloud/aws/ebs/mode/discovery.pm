@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -52,7 +52,6 @@ sub run {
     $disco_stats->{start_time} = time();
 
     my $volumes = $options{custom}->discovery(
-        region => $self->{option_results}->{region},
         service => 'ec2',
         command => 'describe-volumes'
     );

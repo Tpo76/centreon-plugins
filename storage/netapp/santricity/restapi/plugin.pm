@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -30,15 +30,15 @@ sub new {
     bless $self, $class;
 
     $self->{version} = '0.1';
-    %{ $self->{modes} } = (
+    $self->{modes} = {
         'hardware'            => 'storage::netapp::santricity::restapi::mode::hardware',
         'storage-controllers' => 'storage::netapp::santricity::restapi::mode::storagecontrollers',
         'storage-pools'       => 'storage::netapp::santricity::restapi::mode::storagepools',
         'storage-systems'     => 'storage::netapp::santricity::restapi::mode::storagesystems',
         'storage-volumes'     => 'storage::netapp::santricity::restapi::mode::storagevolumes'
-    );
+    };
 
-    $self->{custom_modes}{api} = 'storage::netapp::santricity::restapi::custom::api';
+    $self->{custom_modes}->{api} = 'storage::netapp::santricity::restapi::custom::api';
     return $self;
 }
 

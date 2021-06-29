@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -27,6 +27,9 @@ use vars qw($datas);
 use centreon::plugins::misc;
 
 my $default_dir = '/var/lib/centreon/centplugins';
+if ($^O eq 'MSWin32') {
+    $default_dir = 'C:/Windows/Temp';
+}
 
 sub new {
     my ($class, %options) = @_;
@@ -194,7 +197,7 @@ sub read {
     }
 
     if ($self->{storable} == 1) {
-        open FILE, $self->{statefile_dir} . '/' . $self->{statefile};
+        open FILE, '<', $self->{statefile_dir} . '/' . $self->{statefile};
         eval {
             $self->{datas} = Storable::fd_retrieve(*FILE);
         };

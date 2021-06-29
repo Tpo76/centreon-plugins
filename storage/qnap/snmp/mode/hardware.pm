@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -27,52 +27,78 @@ use warnings;
 
 sub set_system {
     my ($self, %options) = @_;
-    
-    $self->{regexp_threshold_overload_check_section_option} = '^(temperature|disk|smartdisk|fan|raid)$';
-    $self->{regexp_threshold_numeric_check_section_option} = '^(temperature|disk|smartdisk|fan)$';
-    
+
+    $self->{regexp_threshold_numeric_check_section_option} =
+        '^(?:temperature|disk|smartdisk|fan|psu\.fanspeed|psu\.temperature)$';
+
     $self->{cb_hook2} = 'snmp_execute';
     
     $self->{thresholds} = {
         disk => [
+            ['good', 'OK'],
+            ['warning', 'WARNING'],
+            ['abnormal', 'CRITICAL'],
+
+            ['in-use', 'OK'], # es
             ['noDisk', 'OK'],
             ['ready', 'OK'],
             ['invalid', 'CRITICAL'],
             ['rwError', 'CRITICAL'],
             ['unknown', 'UNKNOWN'],
+            ['error', 'CRITICAL']
+        ],
+        fan => [
+            ['ok', 'OK'],
+            ['n/a', 'OK'],
+            ['fail', 'CRITICAL']
+        ],
+        psu => [
+            ['ok', 'OK'],
+            ['fail', 'CRITICAL']
         ],
         smartdisk => [
+            ['good', 'OK'],
+            ['warning', 'WARNING'],
+            ['abnormal', 'CRITICAL'],
+            ['error', 'CRITICAL'],
+
             ['GOOD', 'OK'],
             ['NORMAL', 'OK'],
             ['--', 'OK'],
-            ['.*', 'CRITICAL'],
+            ['.*', 'CRITICAL']
         ],
         raid => [
             ['Ready', 'OK'],
+            ['Synchronizing', 'OK'],
             ['degraded', 'WARNING'],
-            ['.*', 'CRITICAL'],
-        ],
+            ['.*', 'CRITICAL']
+        ]
     };
-    
+
     $self->{components_path} = 'storage::qnap::snmp::mode::components';
-    $self->{components_module} = ['temperature', 'disk', 'fan', 'raid'];
+    $self->{components_module} = ['disk', 'fan', 'mdisk', 'psu', 'raid', 'temperature'];
 }
 
 sub snmp_execute {
     my ($self, %options) = @_;
-    
+
     $self->{snmp} = $options{snmp};
-    $self->{results} = $self->{snmp}->get_multiple_table(oids => $self->{request});
+
+    $self->{is_es} = 0;
+    my $oid_es_uptime = '.1.3.6.1.4.1.24681.2.2.4.0';
+    my $snmp_result = $self->{snmp}->get_leef(oids => [$oid_es_uptime]); # es-SystemUptime
+    if (defined($snmp_result->{$oid_es_uptime})) {
+        $self->{is_es} = 1;
+    }
 }
 
 sub new {
     my ($class, %options) = @_;
-    my $self = $class->SUPER::new(package => __PACKAGE__, %options);
+    my $self = $class->SUPER::new(package => __PACKAGE__, %options, force_new_perfdata => 1);
     bless $self, $class;
-    
-    $options{options}->add_options(arguments => { 
-    });
-    
+
+    $options{options}->add_options(arguments => {});
+
     return $self;
 }
 
@@ -82,14 +108,14 @@ __END__
 
 =head1 MODE
 
-Check hardware (NAS.mib) (Fans, Temperatures, Disks, Raid).
+Check hardware.
 
 =over 8
 
 =item B<--component>
 
 Which component to check (Default: '.*').
-Can be: 'fan', 'disk', 'temperature', 'raid'.
+Can be: 'disk', 'fan', 'mdisk', 'psu', 'raid', 'temperature'.
 
 =item B<--filter>
 

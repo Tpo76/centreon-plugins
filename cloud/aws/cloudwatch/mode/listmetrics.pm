@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -47,7 +47,6 @@ sub manage_selection {
     my ($self, %options) = @_;
 
     $self->{metrics} = $options{custom}->cloudwatch_list_metrics(
-        region => $self->{option_results}->{region},
         namespace => $self->{option_results}->{namespace},
         metric => $self->{option_results}->{metric}
     );

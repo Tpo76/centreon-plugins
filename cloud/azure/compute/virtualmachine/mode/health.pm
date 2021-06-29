@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -29,8 +29,8 @@ sub check_options {
     my ($self, %options) = @_;
     $self->SUPER::check_options(%options);
 
-    $self->{namespace} = 'Microsoft.Compute';
-    $self->{type} = 'virtualMachines';
+    $self->{az_resource_namespace} = 'Microsoft.Compute';
+    $self->{az_resource_type} = 'virtualMachines';
 }
 
 1;

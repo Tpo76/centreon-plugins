@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -27,13 +27,46 @@ use warnings;
 
 sub set_system {
     my ($self, %options) = @_;
-    
-    $self->{regexp_threshold_overload_check_section_option} = '^(temperature|fan|psu|voltage|cpu|memory)$';
+
     $self->{regexp_threshold_numeric_check_section_option} = '^(temperature|fan|voltage|power)$';
-    
+
     $self->{cb_hook2} = 'snmp_execute';
-    
-    $self->{thresholds} = {        
+
+    $self->{thresholds} = {
+        cpu => [
+            ['unknown', 'UNKNOWN'],
+            ['disabled', 'OK'],
+            ['ok', 'OK'],
+            ['not-present', 'OK'],
+            ['error', 'CRITICAL'],
+            ['prefailure-warning', 'WARNING'],
+            ['fail', 'CRITICAL'], # can be failed also
+            ['missing-termination', 'WARNING']
+        ],
+        disk => [
+            ['unknown', 'UNKNOWN'],
+            ['noDisk', 'OK'],
+            ['online', 'OK'],
+            ['ready', 'OK'],
+            ['failed', 'CRITICAL'],
+            ['rebuilding', 'WARNING'],
+            ['hotspareGlobal', 'OK'],
+            ['hotspareDedicated', 'OK'],
+            ['offline', 'OK'],
+            ['unconfiguredFailed', 'WARNING'],
+            ['formatting', 'WARNING'],
+            ['dead', 'CRITICAL']
+        ],
+        fan => [
+            ['unknown', 'UNKNOWN'],
+            ['disabled', 'OK'],
+            ['ok', 'OK'],
+            ['prefailure-predicted', 'WARNING'],
+            ['fail', 'CRITICAL'],
+            ['redundant-fan-failed', 'WARNING'],
+            ['not-manageable', 'OK'],
+            ['not-present', 'OK'],
+        ],
         memory => [
             ['unknown', 'UNKNOWN'],
             ['not-present|not-available', 'OK'],
@@ -46,54 +79,8 @@ sub set_system {
             ['hot-spare', 'OK'],
             ['mirror', 'OK'],
             ['raid', 'OK'],
-            ['hidden', 'OK'],
-        ],        
-        cpu => [
-            ['unknown', 'UNKNOWN'],
-            ['disabled', 'OK'],
-            ['ok', 'OK'],
-            ['not-present', 'OK'],
-            ['error', 'CRITICAL'],
-            ['prefailure-warning', 'WARNING'],
-            ['fail', 'CRITICAL'], # can be failed also
-            ['missing-termination', 'WARNING'],
-        ],        
-        voltage => [
-            ['unknown', 'UNKNOWN'],
-            ['not-available', 'OK'],
-            ['ok', 'OK'],
-            ['too-low', 'WARNING'],
-            ['too-high', 'WARNING'],
-            ['out-of-range', 'CRITICAL'],
-            ['battery-prefailure', 'CRITICAL'],
-            ['warning', 'WARNING'],
-        ],        
-        fan => [
-            ['unknown', 'UNKNOWN'],
-            ['disabled', 'OK'],
-            ['ok', 'OK'],
-            ['prefailure-predicted', 'WARNING'],
-            ['fail', 'CRITICAL'],
-            ['redundant-fan-failed', 'WARNING'],
-            ['not-manageable', 'OK'],
-            ['not-present', 'OK'],
-        ],        
-        temperature => [
-            ['unknown', 'UNKNOWN'],
-            ['sensor-disabled', 'OK'],
-            ['ok', 'OK'],
-            ['sensor-fail', 'CRITICAL'], # can be also sensor-failed
-            ['warning-temp-warm', 'WARNING'],
-            ['warning-temp-cold', 'WARNING'],
-            ['critical-temp-warm', 'CRITICAL'],
-            ['critical-temp-cold', 'CRITICAL'],
-            ['damage-temp-warm', 'WARNING'],
-            ['damage-temp-cold', 'CRITICAL'],
-            ['not-available', 'OK'],
-            ['temperature-warning', 'WARNING'], # can be also temperature-warning-toohot
-            ['temperature-critical-toohot', 'CRITICAL'],
-            ['temperature-normal', 'OK'],            
-        ],        
+            ['hidden', 'OK']
+        ],
         psu => [
             ['unknown', 'UNKNOWN'],
             ['not-present', 'OK'],
@@ -110,30 +97,65 @@ sub set_system {
             ['non-redundant-ac-fail', 'WARNING'],
             
             ['degraded', 'WARNING'],
-            ['critical', 'CRITICAL'],
+            ['critical', 'CRITICAL']
         ],
+        raid => [
+            ['unknown', 'UNKNOWN'],
+            ['online', 'OK'],
+            ['degraded', 'WARNING'],
+            ['offline', 'ok'],
+            ['rebuilding', 'WARNING'],
+            ['verifying', 'OK'],
+            ['initializing', 'OK'],
+            ['morphing', 'OK'],
+            ['partialDegraded', 'WARNING']
+        ],
+        temperature => [
+            ['unknown', 'UNKNOWN'],
+            ['sensor-disabled', 'OK'],
+            ['ok', 'OK'],
+            ['sensor-fail', 'CRITICAL'], # can be also sensor-failed
+            ['warning-temp-warm', 'WARNING'],
+            ['warning-temp-cold', 'WARNING'],
+            ['critical-temp-warm', 'CRITICAL'],
+            ['critical-temp-cold', 'CRITICAL'],
+            ['damage-temp-warm', 'WARNING'],
+            ['damage-temp-cold', 'CRITICAL'],
+            ['not-available', 'OK'],
+            ['temperature-warning', 'WARNING'], # can be also temperature-warning-toohot
+            ['temperature-critical-toohot', 'CRITICAL'],
+            ['temperature-normal', 'OK']         
+        ],
+        voltage => [
+            ['unknown', 'UNKNOWN'],
+            ['not-available', 'OK'],
+            ['ok', 'OK'],
+            ['too-low', 'WARNING'],
+            ['too-high', 'WARNING'],
+            ['out-of-range', 'CRITICAL'],
+            ['battery-prefailure', 'CRITICAL'],
+            ['warning', 'WARNING']
+        ]
     };
-    
+
     $self->{components_path} = 'hardware::server::fujitsu::snmp::mode::components';
-    $self->{components_module} = ['fan', 'voltage', 'psu', 'memory', 'cpu', 'temperature'];
+    $self->{components_module} = ['cpu', 'disk', 'fan', 'memory', 'psu', 'raid', 'temperature', 'voltage'];
 }
 
 sub snmp_execute {
     my ($self, %options) = @_;
-    
+
     $self->{snmp} = $options{snmp};
     $self->{results} = $self->{snmp}->get_multiple_table(oids => $self->{request});
 }
 
 sub new {
     my ($class, %options) = @_;
-    my $self = $class->SUPER::new(package => __PACKAGE__, %options);
+    my $self = $class->SUPER::new(package => __PACKAGE__, %options, force_new_perfdata => 1);
     bless $self, $class;
-    
-    $options{options}->add_options(arguments =>
-                                { 
-                                });
-    
+
+    $options{options}->add_options(arguments => {});
+
     return $self;
 }
 

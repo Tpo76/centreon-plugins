@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -61,7 +61,6 @@ sub new {
     $options{options}->add_help(package => __PACKAGE__, sections => 'REST API OPTIONS', once => 1);
 
     $self->{output} = $options{output};
-    $self->{mode} = $options{mode};    
     $self->{http} = centreon::plugins::http->new(%options);
 
     return $self;
@@ -73,21 +72,7 @@ sub set_options {
     $self->{option_results} = $options{option_results};
 }
 
-sub set_defaults {
-    my ($self, %options) = @_;
-
-    foreach (keys %{$options{default}}) {
-        if ($_ eq $self->{mode}) {
-            for (my $i = 0; $i < scalar(@{$options{default}->{$_}}); $i++) {
-                foreach my $opt (keys %{$options{default}->{$_}[$i]}) {
-                    if (!defined($self->{option_results}->{$opt}[$i])) {
-                        $self->{option_results}->{$opt}[$i] = $options{default}->{$_}[$i]->{$opt};
-                    }
-                }
-            }
-        }
-    }
-}
+sub set_defaults {}
 
 sub check_options {
     my ($self, %options) = @_;
@@ -169,7 +154,7 @@ sub query_range {
 
     my $tz = centreon::plugins::misc::set_timezone(name => $self->{timezone});
     my $dt = DateTime->now(%$tz);
-    my $start_time = $dt->subtract(seconds => $options{timeframe})->epoch();
+    my $start_time = $dt->epoch() - $options{timeframe};
     my $end_time = $dt->epoch();
     my $uri = URI::Encode->new({encode_reserved => 1});
 

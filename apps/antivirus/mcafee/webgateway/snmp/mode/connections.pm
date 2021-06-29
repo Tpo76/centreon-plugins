@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -30,57 +30,57 @@ sub set_counters {
     my ($self, %options) = @_;
 
     $self->{maps_counters_type} = [
-        { name => 'global', type => 0, cb_prefix_output => 'prefix_connection_output' },
+        { name => 'global', type => 0, cb_prefix_output => 'prefix_connection_output' }
     ];
 
     $self->{maps_counters}->{global} = [
-        { label => 'legitimate', set => {
+        { label => 'legitimate', nlabel => 'connections.legitimate.persecond', set => {
                 key_values => [ { name => 'stConnectionsLegitimate', per_second => 1 } ],
                 output_template => 'Legitimate: %d',
                 perfdatas => [
-                    { label => 'legitimate_connections', template => '%d', min => 0, unit => 'connections/s' },
-                ],
+                    { label => 'legitimate_connections', template => '%d', min => 0, unit => 'connections/s' }
+                ]
             }
         },
-        { label => 'blocked', set => {
+        { label => 'blocked', nlabel => 'connections.blocked.persecond', set => {
                 key_values => [ { name => 'stConnectionsBlocked', per_second => 1 } ],
                 output_template => 'Blocked: %d',
                 perfdatas => [
-                    { label => 'blocked_connections', template => '%d', min => 0, unit => 'connections/s' },
-                ],
+                    { label => 'blocked_connections', template => '%d', min => 0, unit => 'connections/s' }
+                ]
             }
         },
-        { label => 'blocked-by-am', set => {
+        { label => 'blocked-by-am', nlabel => 'connections.antimalware.blocked.persecond', set => {
                 key_values => [ { name => 'stBlockedByAntiMalware', per_second => 1 } ],
                 output_template => 'Blocked by Anti Malware: %d',
                 perfdatas => [
-                    { label => 'blocked_by_am', template => '%d', min => 0, unit => 'connections/s' },
-                ],
+                    { label => 'blocked_by_am', template => '%d', min => 0, unit => 'connections/s' }
+                ]
             }
         },
-        { label => 'blocked-by-mf', set => {
+        { label => 'blocked-by-mf',  nlabel => 'connections.mediafilter.blocked.persecond', set => {
                 key_values => [ { name => 'stBlockedByMediaFilter', per_second => 1 } ],
                 output_template => 'Blocked by Media Filter: %d',
                 perfdatas => [
-                    { label => 'blocked_by_mf', template => '%d', min => 0, unit => 'connections/s' },
-                ],
+                    { label => 'blocked_by_mf', template => '%d', min => 0, unit => 'connections/s' }
+                ]
             }
         },
-        { label => 'blocked-by-uf', set => {
+        { label => 'blocked-by-uf',  nlabel => 'connections.urlfilter.blocked.persecond', set => {
                 key_values => [ { name => 'stBlockedByURLFilter', per_second => 1 } ],
                 output_template => 'Blocked by URL Filter: %d',
                 perfdatas => [
-                    { label => 'blocked_by_uf', template => '%d', min => 0, unit => 'connections/s' },
-                ],
+                    { label => 'blocked_by_uf', template => '%d', min => 0, unit => 'connections/s' }
+                ]
             }
-        },
+        }
     ];
 }
 
 sub prefix_connection_output {
     my ($self, %options) = @_;
 
-    return "Connections (per sec) ";
+    return 'Connections (per sec) ';
 }
 
 sub new {
@@ -103,16 +103,18 @@ my $oid_stBlockedByURLFilter = '.1.3.6.1.4.1.1230.2.7.2.1.7.0';
 sub manage_selection {
     my ($self, %options) = @_;
 
-    $self->{cache_name} = "mcafee_" . $options{snmp}->get_hostname()  . '_' . $options{snmp}->get_port() . '_' . $self->{mode} . '_' .
+    $self->{cache_name} = 'mcafee_' . $options{snmp}->get_hostname()  . '_' . $options{snmp}->get_port() . '_' . $self->{mode} . '_' .
         (defined($self->{option_results}->{filter_name}) ? md5_hex($self->{option_results}->{filter_name}) : md5_hex('all')) . '_' .
         (defined($self->{option_results}->{filter_counters}) ? md5_hex($self->{option_results}->{filter_counters}) : md5_hex('all'));
 
-    my $results = $options{snmp}->get_leef(oids => [ $oid_stConnectionsLegitimate, $oid_stBlockedByAntiMalware,
-                                                     $oid_stConnectionsBlocked, $oid_stBlockedByMediaFilter,
-                                                     $oid_stBlockedByURLFilter ], 
-                                               nothing_quit => 1);
-    
-    $self->{global} = {};
+    my $results = $options{snmp}->get_leef(
+        oids => [
+            $oid_stConnectionsLegitimate, $oid_stBlockedByAntiMalware,
+            $oid_stConnectionsBlocked, $oid_stBlockedByMediaFilter,
+            $oid_stBlockedByURLFilter
+        ],
+        nothing_quit => 1
+    );
 
     $self->{global} = {
         stConnectionsLegitimate => $results->{$oid_stConnectionsLegitimate},

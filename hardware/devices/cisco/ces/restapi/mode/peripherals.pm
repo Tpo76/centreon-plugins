@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -29,7 +29,7 @@ sub set_counters {
     my ($self, %options) = @_;
 
     $self->{maps_counters_type} = [
-        { name => 'global', type => 0 },
+        { name => 'global', type => 0 }
     ];
 
     $self->{maps_counters}->{global} = [
@@ -37,8 +37,8 @@ sub set_counters {
                 key_values => [ { name => 'connected' } ],
                 output_template => 'peripherals connected: %d',
                 perfdatas => [
-                    { value => 'connected', template => '%d', min => 0 },
-                ],
+                    { template => '%d', min => 0 }
+                ]
             }
         }
     ];
@@ -51,7 +51,7 @@ sub new {
 
     $self->{version} = '1.0';
     $options{options}->add_options(arguments => {
-         'filter-since:s' => { name => 'filter_since', default => 86400 },
+         'filter-since:s' => { name => 'filter_since', default => 86400 }
     });
 
     centreon::plugins::misc::mymodule_load(
@@ -108,7 +108,7 @@ __END__
 
 =head1 MODE
 
-Check peripherals device connected.
+Check peripherals device connected (since TC 7.2).
 
 =over 8
 

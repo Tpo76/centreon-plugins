@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -31,7 +31,7 @@ sub new {
     bless $self, $class;
 
     $options{options}->add_options(arguments => {
-        'filter-edge-name:s' => { name => 'filter_edge_name' },
+        'filter-edge-name:s' => { name => 'filter_edge_name' }
     });
 
     return $self;
@@ -45,7 +45,7 @@ sub check_options {
 sub manage_selection {
     my ($self, %options) = @_;
 
-    my $edges = $options{custom}->list_edges;
+    my $edges = $options{custom}->list_edges();
     foreach my $edge (@{$edges}) {
         if (defined($self->{option_results}->{filter_edge_name}) && $self->{option_results}->{filter_edge_name} ne '' &&
             $edge->{name} !~ /$self->{option_results}->{filter_edge_name}/) {

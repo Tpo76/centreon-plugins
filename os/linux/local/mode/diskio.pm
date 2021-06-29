@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -24,7 +24,6 @@ use base qw(centreon::plugins::templates::counter);
 
 use strict;
 use warnings;
-use centreon::plugins::misc;
 use Digest::MD5 qw(md5_hex);
 
 sub custom_usage_calc {
@@ -73,8 +72,8 @@ sub set_counters {
                 output_use => 'usage_persecond', threshold_use => 'usage_persecond',
                 perfdatas => [
                     { label => 'readio', value => 'usage_persecond', template => '%d',
-                      unit => 'B/s', min => 0, label_extra_instance => 1, instance_use => 'display' },
-                ],
+                      unit => 'B/s', min => 0, label_extra_instance => 1, instance_use => 'display' }
+                ]
             }
         },
         { label => 'write-usage', nlabel => 'device.io.write.usage.bytespersecond', set => {
@@ -85,8 +84,8 @@ sub set_counters {
                 output_use => 'usage_persecond', threshold_use => 'usage_persecond',
                 perfdatas => [
                     { label => 'writeio', value => 'usage_persecond', template => '%d',
-                      unit => 'B/s', min => 0, label_extra_instance => 1, instance_use => 'display' },
-                ],
+                      unit => 'B/s', min => 0, label_extra_instance => 1, instance_use => 'display' }
+                ]
             }
         },
         { label => 'read-time', nlabel => 'device.io.read.time.milliseconds', set => {
@@ -94,8 +93,8 @@ sub set_counters {
                 output_template => 'read time : %.2f ms',
                 perfdatas => [
                     { label => 'readtime', template => '%.2f',
-                      unit => 'ms', min => 0, label_extra_instance => 1, instance_use => 'display' },
-                ],
+                      unit => 'ms', min => 0, label_extra_instance => 1, instance_use => 'display' }
+                ]
             }
         },
         { label => 'write-time', nlabel => 'device.io.write.time.milliseconds', set => {
@@ -103,8 +102,8 @@ sub set_counters {
                 output_template => 'write time : %.2f ms',
                 perfdatas => [
                     { label => 'writetime', template => '%.2f',
-                      unit => 'ms', min => 0, label_extra_instance => 1, instance_use => 'display' },
-                ],
+                      unit => 'ms', min => 0, label_extra_instance => 1, instance_use => 'display' }
+                ]
             }
         },
         { label => 'utils', nlabel => 'device.io.utils.percentage', set => {
@@ -122,10 +121,10 @@ sub set_counters {
                 output_use => 'utils', threshold_use => 'utils',
                 perfdatas => [
                     { label => 'utils', value => 'utils',  template => '%.2f',
-                      unit => '%', min => 0, max => 100, label_extra_instance => 1, instance_use => 'display' },
-                ],
+                      unit => '%', min => 0, max => 100, label_extra_instance => 1, instance_use => 'display' }
+                ]
             }
-        },
+        }
     ];
 }
 
@@ -141,48 +140,21 @@ sub new {
     bless $self, $class;
     
     $options{options}->add_options(arguments => {
-        'hostname:s'            => { name => 'hostname' },
-        'remote'                => { name => 'remote' },
-        'ssh-option:s@'         => { name => 'ssh_option' },
-        'ssh-path:s'            => { name => 'ssh_path' },
-        'ssh-command:s'         => { name => 'ssh_command', default => 'ssh' },
-        'timeout:s'             => { name => 'timeout', default => 30 },
-        'sudo'                  => { name => 'sudo' },
-        'command:s'             => { name => 'command', default => 'tail' },
-        'command-path:s'        => { name => 'command_path', },
-        'command-options:s'     => { name => 'command_options', default => '-n +1 /proc/stat /proc/diskstats 2>&1' },
-        'name:s'                => { name => 'name' },
-        'regexp'                => { name => 'use_regexp' },
-        'regexp-isensitive'     => { name => 'use_regexpi' },
-        'interrupt-frequency:s' => { name => 'interrupt_frequency', default => 1000 },
-        'bytes_per_sector:s'    => { name => 'bytes_per_sector', default => 512 },
-        'skip'                  => { name => 'skip' },
+        'filter-partition-name:s' => { name => 'filter_partition_name' },
+        'interrupt-frequency:s'   => { name => 'interrupt_frequency', default => 1000 },
+        'bytes-per-sector:s'      => { name => 'bytes_per_sector', default => 512 },
+        'skip'                    => { name => 'skip' }
     });
 
-    $self->{hostname} = undef;
     return $self;
-}
-
-sub check_options {
-    my ($self, %options) = @_;
-    $self->SUPER::check_options(%options);
-    
-    $self->{hostname} = $self->{option_results}->{hostname};
-    if (!defined($self->{hostname})) {
-        $self->{hostname} = 'me';
-    }
 }
 
 sub manage_selection {
     my ($self, %options) = @_;
 
-    my $stdout = centreon::plugins::misc::execute(
-        output => $self->{output},
-        options => $self->{option_results},
-        sudo => $self->{option_results}->{sudo},
-        command => $self->{option_results}->{command},
-        command_path => $self->{option_results}->{command_path},
-        command_options => $self->{option_results}->{command_options}
+    my ($stdout) = $options{custom}->execute_command(
+        command => 'tail',
+        command_options => '-n +1 /proc/stat /proc/diskstats 2>&1'
     );
     
     $stdout =~ /\/proc\/stat(.*?)\/proc\/diskstats.*?\n(.*)/msg;
@@ -198,15 +170,11 @@ sub manage_selection {
     }
 
     $self->{device} = {};
-    while ($disk_parts =~ /^\s*\S+\s+\S+\s+(\S+)\s+\S+\s+\S+\s+(\S+)\s+(\S+)\s+\S+\s+\S+\s+(\S+)\s+(\S+)\s+\S+\s+\S+\s+(\S+)\s*/msg) {
+    while ($disk_parts =~ /^\s*\S+\s+\S+\s+(\S+)\s+\d+\s+\d+\s+(\d+)\s+(\d+)\s+\d+\s+\d+\s+(\d+)\s+(\d+)\s+\d+\s+\d+\s+(\d+)/mg) {
         my ($partition_name, $read_sector, $write_sector, $read_ms, $write_ms, $ms_ticks) = ($1, $2, $4, $3, $5, $6);
 
-        next if (defined($self->{option_results}->{name}) && defined($self->{option_results}->{use_regexp}) && defined($self->{option_results}->{use_regexpi}) 
-            && $partition_name !~ /$self->{option_results}->{name}/i);
-        next if (defined($self->{option_results}->{name}) && defined($self->{option_results}->{use_regexp}) && !defined($self->{option_results}->{use_regexpi}) 
-            && $partition_name !~ /$self->{option_results}->{name}/);
-        next if (defined($self->{option_results}->{name}) && !defined($self->{option_results}->{use_regexp}) && !defined($self->{option_results}->{use_regexpi})
-            && $partition_name ne $self->{option_results}->{name});
+        next if (defined($self->{option_results}->{filter_partition_name}) && $self->{option_results}->{filter_partition_name} ne '' &&
+            $partition_name !~ /$self->{option_results}->{filter_partition_name}/);
 
         if (defined($self->{option_results}->{skip}) && $read_sector == 0 && $write_sector == 0) {
             $self->{output}->output_add(long_msg => "skipping device '" . $partition_name . "': no read/write IO.", debug => 1);
@@ -224,7 +192,7 @@ sub manage_selection {
             cpu_system => $cpu_system,
             cpu_idle => $cpu_idle,
             cpu_user => $cpu_user,
-            cpu_iowait => $cpu_iowait,
+            cpu_iowait => $cpu_iowait
         };
     }
 
@@ -237,7 +205,9 @@ sub manage_selection {
         $self->{output}->option_exit();
     }
 
-    $self->{cache_name} = 'cache_linux_local_' . $self->{hostname}  . '_' . $self->{mode} . '_' . (defined($self->{option_results}->{name}) ? md5_hex($self->{option_results}->{name}) : md5_hex('all'))
+    $self->{cache_name} = 'cache_linux_local_' . $options{custom}->get_identifier()  . '_' . $self->{mode} . '_' .
+        (defined($self->{option_results}->{filter_counters}) ? md5_hex($self->{option_results}->{filter_counters}) : md5_hex('all')) . '_' .
+        (defined($self->{option_results}->{filter_partition_name}) ? md5_hex($self->{option_results}->{filter_partition_name}) : md5_hex('all'));
 }
 
 1;
@@ -247,7 +217,9 @@ __END__
 =head1 MODE
 
 Check some disk io counters:
-read and writes bytes per seconds, milliseconds time spent reading and writing, %util (like iostat) 
+read and writes bytes per seconds, milliseconds time spent reading and writing, %util (like iostat)
+
+Command used: tail -n +1 /proc/stat /proc/diskstats 2>&1
 
 =over 8
 
@@ -298,17 +270,9 @@ Thresholds.
 Can be: 'read-usage', 'write-usage', 'read-time', 'write-time',
 'utils'.
 
-=item B<--name>
+=item B<--filter-partition-name>
 
-Set the partition name (empty means 'check all partitions')
-
-=item B<--regexp>
-
-Allows to use regexp to filter partition name (with option --name).
-
-=item B<--regexp-isensitive>
-
-Allows to use regexp non case-sensitive (with --regexp).
+Filter partition name (regexp can be used).
 
 =item B<--bytes-per-sector>
 

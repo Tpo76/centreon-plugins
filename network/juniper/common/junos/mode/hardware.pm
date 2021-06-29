@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -28,8 +28,7 @@ use centreon::plugins::statefile;
 
 sub set_system {
     my ($self, %options) = @_;
-    
-    $self->{regexp_threshold_overload_check_section_option} = '^(fru|operating|alarm)$';
+
     $self->{regexp_threshold_numeric_check_section_option} = '^(operating-temperature|operating-cpu|operating-buffer|operating-heap)$';
     
     $self->{cb_hook1} = 'init_cache';
@@ -47,7 +46,7 @@ sub set_system {
             ['offline', 'CRITICAL'],
             ['diagnostic', 'WARNING'],
             ['standby', 'WARNING'],
-            ['empty', 'OK'],
+            ['empty', 'OK']
         ],
         operating => [
             ['runningAtFullSpeed', 'WARNING'],
@@ -56,13 +55,13 @@ sub set_system {
             ['ready', 'OK'], 
             ['reset', 'WARNING'],
             ['down', 'CRITICAL'],
-            ['standby', 'OK'],
+            ['standby', 'OK']
         ],
         alarm => [
             ['other', 'OK'],
             ['off', 'OK'],
-            ['on', 'CRITICAL'],
-        ],
+            ['on', 'CRITICAL']
+        ]
     };
     
     $self->{components_path} = 'network::juniper::common::junos::mode::components';
@@ -81,9 +80,9 @@ sub new {
     my ($class, %options) = @_;
     my $self = $class->SUPER::new(package => __PACKAGE__, %options);
     bless $self, $class;
-    
+
     $options{options}->add_options(arguments => {
-        'reload-cache-time:s'     => { name => 'reload_cache_time', default => 180 },
+        'reload-cache-time:s' => { name => 'reload_cache_time', default => 180 }
     });
 
     $self->{statefile_cache} = centreon::plugins::statefile->new(%options);    
@@ -175,8 +174,9 @@ sub load_components {
     foreach (@{$self->{components_module}}) {
         if (/$self->{option_results}->{component}/) {
             my $mod_name = $self->{components_path} . "::$_";
-            centreon::plugins::misc::mymodule_load(output => $self->{output}, module => $mod_name,
-                                                   error_msg => "Cannot load module '$mod_name'.") if ($self->{load_components} == 1);
+            centreon::plugins::misc::mymodule_load(
+                output => $self->{output}, module => $mod_name,
+                error_msg => "Cannot load module '$mod_name'.") if ($self->{load_components} == 1);
             $self->{loaded} = 1;
         }
     }
@@ -236,13 +236,13 @@ Example: --threshold-overload='operating,CRITICAL,^(?!(running)$)'
 
 =item B<--warning>
 
-Set warning threshold for fru temperatures (syntax: type,regexp,threshold)
-Example: --warning='fru-temperature,.*,30'
+Set warning threshold  (syntax: type,regexp,threshold)
+Example: --warning='operating-temperature,.*,30'
 
 =item B<--critical>
 
-Set critical threshold for fru temperatures (syntax: type,regexp,threshold)
-Example: --critical='fru-temperature,.*,40'
+Set critical threshold (syntax: type,regexp,threshold)
+Example: --critical='operating-temperature,.*,40'
 
 =item B<--reload-cache-time>
 

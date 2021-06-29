@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -32,7 +32,12 @@ sub new {
     bless $self, $class;
 
     $options{options}->add_options(arguments => {
-        'prettify' => { name => 'prettify' }
+        'prettify'                   => { name => 'prettify' },
+        'resource-type:s'            => { name => 'resource_type'},
+        'filter-network-id:s'        => { name => 'filter_network_id' },
+        'filter-organization-name:s' => { name => 'filter_organization_name' },
+        'filter-organization-id:s'   => { name => 'filter_organization_id' },
+        'filter-tags:s'              => { name => 'filter_tags' }
     });
 
     return $self;
@@ -41,50 +46,126 @@ sub new {
 sub check_options {
     my ($self, %options) = @_;
     $self->SUPER::init(%options);
+
+    if (!defined($self->{option_results}->{resource_type}) || $self->{option_results}->{resource_type} eq '') {
+        $self->{option_results}->{resource_type} = 'device';
+    }
+    if ($self->{option_results}->{resource_type} !~ /^device|network$/) {
+        $self->{output}->add_option_msg(short_msg => 'unknown resource type');
+        $self->{output}->option_exit();
+    }
+}
+
+sub discovery_devices {
+    my ($self, %options) = @_;
+
+    my $devices = $options{custom}->get_devices(
+        organizations => [keys %{$options{organizations}}],
+        disable_cache => 1
+    );
+    my $devices_statuses = $options{custom}->get_organization_device_statuses();
+
+    my @results;
+    foreach (values %$devices) {
+        next if (defined($self->{option_results}->{filter_network_id}) && $self->{option_results}->{filter_network_id} ne '' &&
+            $_->{networkId} !~ /$self->{option_results}->{filter_network_id}/);
+        next if (defined($self->{option_results}->{filter_tags}) && $self->{option_results}->{filter_tags} ne '' &&
+            (!defined($_->{tags}) || $_->{tags} !~ /$self->{option_results}->{filter_tags}/));
+        next if (defined($self->{option_results}->{filter_organization_id}) && $self->{option_results}->{filter_organization_id} ne '' &&
+            $options{networks}->{ $_->{networkId} }->{organizationId} !~ /$self->{option_results}->{filter_organization_id}/);
+        next if (defined($self->{option_results}->{filter_organization_name}) && $self->{option_results}->{filter_organization_name} ne '' &&
+            $options{organizations}->{ $options{networks}->{ $_->{networkId} }->{organizationId} }->{name} !~ /$self->{option_results}->{filter_organization_name}/);
+
+        my $node = {
+            name => $_->{name},
+            status => $devices_statuses->{ $_->{serial} }->{status},
+            address => $_->{address},
+            latitude => $_->{lat},
+            longitude => $_->{lng},
+            mac => $_->{mac},
+            url => $_->{url},
+            notes => $_->{notes},
+            tags => $_->{tags},
+            model => $_->{model},
+            firmware => $_->{firmware},
+            serial => $_->{serial},
+            public_ip => $devices_statuses->{ $_->{serial} }->{publicIp},
+            lan_ip => $_->{lanIp},
+            network_id => $_->{networkId},
+            network_name => $options{networks}->{ $_->{networkId} }->{name},
+            organization_name => $options{organizations}->{ $options{networks}->{ $_->{networkId} }->{organizationId} }->{name},
+            configuration_updated_at => $_->{configurationUpdatedAt},
+            last_reported_at => $devices_statuses->{ $_->{serial} }->{lastReportedAt}
+        };
+
+        push @results, $node;
+    }
+
+    return @results;
+
+}
+
+sub discovery_networks {
+    my ($self, %options) = @_;
+
+    my @results;
+    foreach (values %{$options{networks}}) {
+        next if (defined($self->{option_results}->{filter_tags}) && $self->{option_results}->{filter_tags} ne '' &&
+            (!defined($_->{tags}) || $_->{tags} !~ /$self->{option_results}->{filter_tags}/));
+        next if (defined($self->{option_results}->{filter_organization_id}) && $self->{option_results}->{filter_organization_id} ne '' &&
+            $_->{organizationId} !~ /$self->{option_results}->{filter_organization_id}/);
+        next if (defined($self->{option_results}->{filter_organization_name}) && $self->{option_results}->{filter_organization_name} ne '' &&
+            $options{organizations}->{ $_->{organizationId} }->{name} !~ /$self->{option_results}->{filter_organization_name}/);
+
+        my $node = {
+            name => $_->{name},
+            id => $_->{id},
+            type => $_->{type},
+            timezone => $_->{timeZone},
+            tags => $_->{tags},
+            product_types => $_->{productTypes},
+            organization_id => $_->{organizationId},
+            organization_name => $options{organizations}->{ $_->{organizationId} }->{name},
+            disable_remote_status_page => $_->{disableRemoteStatusPage},
+            disable_my_meraki_com => $_->{disableMyMerakiCom}
+        };
+
+        push @results, $node;
+    }
+
+    return @results;
 }
 
 sub run {
     my ($self, %options) = @_;
 
-    my (@disco_data, $disco_stats);
+    my @disco_data;
+    my $disco_stats;
+
     $disco_stats->{start_time} = time();
 
     my $organizations = $options{custom}->get_organizations(disable_cache => 1);
+    
     my $networks = $options{custom}->get_networks(
-        organizations => [keys %{$self->{organizations}}],
+        organizations => [keys %{$organizations}],
         disable_cache => 1
     );
-    my $devices = $options{custom}->get_devices(
-        organizations => [keys %{$self->{organizations}}],
-        disable_cache => 1
-    );
-    my $devices_statuses = $options{custom}->get_organization_device_statuses();
+
+    if ($self->{option_results}->{resource_type} eq 'network') {
+        @disco_data = $self->discovery_networks(
+            networks => $networks,
+            organizations => $organizations
+        );
+    } else {
+        @disco_data = $self->discovery_devices(
+            networks => $networks,
+            organizations => $organizations,
+            %options
+        );
+    }
 
     $disco_stats->{end_time} = time();
     $disco_stats->{duration} = $disco_stats->{end_time} - $disco_stats->{start_time};
-
-    foreach (values %$devices) {
-        my $node = {
-            %$_,
-            %{$devices_statuses->{$_->{serial}}},
-            networkName => $networks->{ $devices_statuses->{$_->{serial}}->{networkId} }->{name},
-            organizationName => $organizations->{ $networks->{ $devices_statuses->{$_->{serial}}->{networkId} }->{organizationId} }->{name},
-            type => 'device'
-        };
-
-        push @disco_data, $node;
-    }
-
-    foreach (values %$networks) {
-        my $node = {
-            %$_,
-            organizationName => $organizations->{ $_->{organizationId} }->{name},
-            type => 'network'
-        };
-
-        push @disco_data, $node;
-    }
-   
     $disco_stats->{discovered_items} = @disco_data;
     $disco_stats->{results} = \@disco_data;
 
@@ -119,9 +200,25 @@ Resources discovery.
 
 Prettify JSON output.
 
-=item B<--ignore-permission-errors>
+=item B<--resource-type>
 
-Continue the discovery and ignore permission errors (403 status code).
+Choose the type of resources to discover (Can be: 'device', 'network').
+
+=item B<--filter-network-id>
+
+Filter by network id (Can be a regexp).
+
+=item B<--filter-organization-id>
+
+Filter by organization id (Can be a regexp).
+
+=item B<--filter-organization-name>
+
+Filter by organization name (Can be a regexp).
+
+=item B<--filter-tags>
+
+Filter by tags (Can be a regexp).
 
 =back
 

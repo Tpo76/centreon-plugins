@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -34,7 +34,7 @@ sub new {
     $options{options}->add_options(arguments => {
         'group'     => { name => 'group' },
         'inventory' => { name => 'inventory' },
-        'prettify'  => { name => 'prettify' },
+        'prettify'  => { name => 'prettify' }
     });
 
     return $self;
@@ -61,7 +61,7 @@ sub run {
     $disco_stats->{end_time} = time();
     $disco_stats->{duration} = $disco_stats->{end_time} - $disco_stats->{start_time};
 
-    foreach my $host (@{$hosts->{results}}) {
+    foreach my $host (@$hosts) {
         my %host;
         $host{name} = $host->{name};
         $host{id} = $host->{id};

@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -69,7 +69,7 @@ sub set_counters {
                 key_values => [ { name => 'total' } ],
                 output_template => 'Total Jobs : %s',
                 perfdatas => [
-                    { label => 'total', value => 'total', template => '%s', min => 0 }
+                    { label => 'total', template => '%s', min => 0 }
                 ]
             }
         }
@@ -170,7 +170,7 @@ sub manage_selection {
 
     my $decoded;
     eval {
-        $decoded = JSON::XS->new->utf8->decode($stdout);
+        $decoded = JSON::XS->new->decode($stdout);
     };
     if ($@) {
         $self->{output}->add_option_msg(short_msg => "Cannot decode json response: $@");
@@ -190,13 +190,14 @@ sub manage_selection {
         $job->{creationTimeUTC} =~ s/,/\./;
         $job->{endTimeUTC} =~ s/,/\./;
 
+        my $job_type = defined($job_type->{ $job->{type} }) ? $job_type->{ $job->{type} } : 'unknown';
         if (defined($self->{option_results}->{filter_name}) && $self->{option_results}->{filter_name} ne '' &&
             $job->{name} !~ /$self->{option_results}->{filter_name}/) {
             $self->{output}->output_add(long_msg => "skipping job '" . $job->{name} . "': no matching filter.", debug => 1);
             next;
         }
         if (defined($self->{option_results}->{filter_type}) && $self->{option_results}->{filter_type} ne '' &&
-            $job_type->{ $job->{type} } !~ /$self->{option_results}->{filter_type}/) {
+            $job_type !~ /$self->{option_results}->{filter_type}/) {
             $self->{output}->output_add(long_msg => "skipping job '" . $job->{name} . "': no matching filter type.", debug => 1);
             next;
         }
@@ -218,7 +219,7 @@ sub manage_selection {
         $self->{job}->{ $job->{name} } = {
             display => $job->{name},
             elapsed => $elapsed_time,
-            type => $job_type->{ $job->{type} },
+            type => $job_type,
             is_running => $job->{isRunning} =~ /True|1/ ? 1 : ($job->{creationTimeUTC} !~ /[0-9]/ ? 2 : 0),
             status => defined($job_result->{ $job->{result} }) && $job_result->{ $job->{result} } ne '' ?
                 $job_result->{ $job->{result} } : '-'

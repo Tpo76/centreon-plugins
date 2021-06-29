@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -50,14 +50,20 @@ Try {
             type = $disk.DriveType;
             providername = $disk.ProviderName;
             desc = $disk.VolumeName;
-            size = $disk.Size.toString();
-            freespace = $disk.FreeSpace.toString()
+            size = $null;
+            freespace = $null;
         }
 
+        if ($disk.Size -ne $null) {
+            $item.size = $disk.Size.toString()
+        }
+        if ($disk.FreeSpace -ne $null) {
+            $item.freespace = $disk.FreeSpace.toString()
+        }
         $items.Add($item)
     }
 
-    $jsonString = $items | ConvertTo-JSON-20 -forceArray 1
+    $jsonString = $items | ConvertTo-JSON-20 -forceArray $true
     Write-Host $jsonString
 } Catch {
     Write-Host $Error[0].Exception

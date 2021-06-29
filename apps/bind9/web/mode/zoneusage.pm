@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -139,7 +139,7 @@ Example: --filter-counters='request'
 
 Filter zone name (can be a regexp).
 
-=item B<--warning-*> <--critical-*>
+=item B<--warning-*> B<--critical-*>
 
 Thresholds.
 Can be: qtype-a', 'qtype-cname', 'qtype-mx', 'qtype-txt', 'qtype-soa', 'qtype-ptr', 'qtype-ns',

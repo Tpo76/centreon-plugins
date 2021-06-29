@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -88,8 +88,10 @@ sub run {
             $prct, $size_value . " " . $size_unit
         )
     );
+
     $self->{output}->perfdata_add(
-        label => "used", unit => 'B',
+        label => 'used', unit => 'B',
+        nlabel => 'storage.space.usage.bytes',
         value => $fgSysDiskUsage,
         warning => $self->{perfdata}->get_perfdata_for_output(label => 'warning', total => $fgSysDiskCapacity, cast_int => 1),
         critical => $self->{perfdata}->get_perfdata_for_output(label => 'critical', total => $fgSysDiskCapacity, cast_int => 1),

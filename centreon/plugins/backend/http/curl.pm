@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -32,7 +32,7 @@ sub new {
 
     if (!defined($options{noptions}) || $options{noptions} != 1) {
         $options{options}->add_options(arguments => {
-            'curl-opt:s@'   => { name => 'curl_opt' },
+            'curl-opt:s@' => { name => 'curl_opt' }
         });
         $options{options}->add_help(package => __PACKAGE__, sections => 'BACKEND CURL OPTIONS', once => 1);
     }
@@ -59,7 +59,7 @@ sub check_options {
 
     foreach (('unknown_status', 'warning_status', 'critical_status')) {
         if (defined($options{request}->{$_})) {
-            $options{request}->{$_} =~ s/%\{http_code\}/\$self->{response_code}/g;
+            $options{request}->{$_} =~ s/%\{http_code\}/\$values->{code}/g;
         }
     }
 
@@ -109,7 +109,7 @@ my $http_code_explained = {
     502 => 'Bad Gateway',
     503 => 'Service Unavailable',
     504 => 'Gateway Timeout',
-    505 => 'HTTP Version Not Supported',
+    505 => 'HTTP Version Not Supported'
 };
 
 sub cb_debug {
@@ -157,18 +157,22 @@ sub curl_setopt {
 sub set_method {
     my ($self, %options) = @_;
 
-    if ($options{request}->{method} eq 'GET') {
-        return ;
-    }
+    $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_CUSTOMREQUEST'), parameter => undef);
+    $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_POSTFIELDS'), parameter => undef);
+    $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_HTTPGET'), parameter => 1);
 
     if ($options{content_type_forced} == 1) {
         $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_POSTFIELDS'), parameter => $options{request}->{query_form_post})
-            if (defined($options{request}->{query_form_post}) && $options{request}->{query_form_post} ne '');
+            if (defined($options{request}->{query_form_post}));
     } elsif (defined($options{request}->{post_params})) {
         my $uri_post = URI->new();
         $uri_post->query_form($options{request}->{post_params});
         push @{$options{headers}}, 'Content-Type: application/x-www-form-urlencoded';
         $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_POSTFIELDS'), parameter => $uri_post->query);
+    }
+
+    if ($options{request}->{method} eq 'GET') {
+        return ;
     }
 
     if ($options{request}->{method} eq 'POST') {
@@ -204,7 +208,7 @@ sub set_auth {
         $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_SSLKEY'), parameter => $options{request}->{key_file});
         $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_KEYPASSWD'), parameter => $options{request}->{cert_pwd});
     }
-    
+
     $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_SSLCERTTYPE'), parameter => "PEM");
     if (defined($options{request}->{cert_pkcs12})) {
         $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_SSLCERTTYPE'), parameter => "P12");
@@ -227,17 +231,38 @@ sub set_proxy {
 sub set_extra_curl_opt {
     my ($self, %options) = @_;
 
-    my $fields = { key => '', value => '' };
+    my $entries = {};
     foreach (@{$options{request}->{curl_opt}}) {
-        ($fields->{key}, $fields->{value}) = split /=>/;
-        foreach my $label ('key', 'value') {
-            $fields->{$label} = centreon::plugins::misc::trim($fields->{$label});
-            if ($fields->{$label} =~ /^CURLOPT|CURL/) {
-                $fields->{$label} = $self->{constant_cb}->(name => $fields->{$label});
-            }
+        my ($key, $value) = split /=>/;
+        $key = centreon::plugins::misc::trim($key);
+
+        if (!defined($entries->{$key})) {
+            $entries->{$key} = { val => [], force_array => 0 };
         }
 
-        $self->curl_setopt(option => $fields->{key}, parameter => $fields->{value});
+        $value = centreon::plugins::misc::trim($value);
+        if ($value =~ /^\[(.*)\]$/) {
+            $entries->{$key}->{force_array} = 1;
+            $value = centreon::plugins::misc::trim($1);
+        }
+        if ($value  =~ /^CURLOPT|CURL/) {
+            $value = $self->{constant_cb}->(name => $value);
+        }
+
+        push @{$entries->{$key}->{val}}, $value; 
+    }
+
+    foreach (keys %$entries) {
+        my $key = $_;
+        if (/^CURLOPT|CURL/) {
+            $key = $self->{constant_cb}->(name => $_);
+        }
+
+        if ($entries->{$_}->{force_array} == 1 || scalar(@{$entries->{$_}->{val}}) > 1) {
+            $self->curl_setopt(option => $key, parameter => $entries->{$_}->{val});
+        } else {
+            $self->curl_setopt(option => $key, parameter => pop @{$entries->{$_}->{val}});
+        }
     }
 }
 
@@ -276,7 +301,7 @@ sub request {
         $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_VERBOSE'), parameter => 1);
     }
 
-    if (defined($options{request}->{timeout})) {
+    if (defined($options{request}->{timeout}) && $options{request}->{timeout} =~ /\d/) {
         $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_TIMEOUT'), parameter => $options{request}->{timeout});
     }
     if (defined($options{request}->{cookies_file})) {
@@ -315,7 +340,7 @@ sub request {
     my $headers = [];
     my $content_type_forced = 0;
     foreach my $key (keys %{$options{request}->{headers}}) {
-        push @$headers, $key . ':' . $options{request}->{headers}->{$key};
+        push @$headers, $key . ':' . (defined($options{request}->{headers}->{$key}) ? $options{request}->{headers}->{$key} : '');
         if ($key =~ /content-type/i) {
             $content_type_forced = 1;
         }
@@ -330,6 +355,10 @@ sub request {
     if (defined($options{request}->{cacert_file}) && $options{request}->{cacert_file} ne '') {
         $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_CAINFO'), parameter => $options{request}->{cacert_file});
     }
+    if (defined($options{request}->{insecure})) {
+        $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_SSL_VERIFYPEER'), parameter => 0);
+        $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_SSL_VERIFYHOST'), parameter => 0);
+    }
 
     $self->set_auth(%options);
     $self->set_proxy(%options);
@@ -341,6 +370,10 @@ sub request {
     $self->{response_headers} = [{}];
     $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_HEADERDATA'), parameter => $self);
     $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_HEADERFUNCTION'), parameter => \&cb_get_header);
+
+    if (defined($options{request}->{certinfo}) && $options{request}->{certinfo} == 1) {
+        $self->curl_setopt(option => $self->{constant_cb}->(name => 'CURLOPT_CERTINFO'), parameter => 1);
+    }
 
     eval {
         $self->{curl_easy}->perform();
@@ -361,13 +394,13 @@ sub request {
         local $SIG{__DIE__} = sub { $message = $_[0]; };
 
         if (defined($options{request}->{critical_status}) && $options{request}->{critical_status} ne '' &&
-            eval "$options{request}->{critical_status}") {
+            $self->{output}->test_eval(test => $options{request}->{critical_status}, values => { code => $self->{response_code} })) {
             $status = 'critical';
         } elsif (defined($options{request}->{warning_status}) && $options{request}->{warning_status} ne '' &&
-            eval "$options{request}->{warning_status}") {
+            $self->{output}->test_eval(test => $options{request}->{warning_status}, values => { code => $self->{response_code} })) {
             $status = 'warning';
         } elsif (defined($options{request}->{unknown_status}) && $options{request}->{unknown_status} ne '' &&
-            eval "$options{request}->{unknown_status}") {
+            $self->{output}->test_eval(test => $options{request}->{unknown_status}, values => { code => $self->{response_code} })) {
             $status = 'unknown';
         }
     };
@@ -439,6 +472,37 @@ sub get_message {
     my ($self, %options) = @_;
 
     return $http_code_explained->{$self->{response_code}};
+}
+
+sub get_certificate {
+    my ($self, %options) = @_;
+
+    my $certs = $self->{curl_easy}->getinfo($self->{constant_cb}->(name => 'CURLINFO_CERTINFO'));
+    return ('pem', $certs->[0]->{Cert});
+}
+
+sub get_times {
+    my ($self, %options) = @_;
+
+    # TIME_T = 7.61.0
+    my $resolve = $self->{curl_easy}->getinfo($self->{constant_cb}->(name => 'CURLINFO_NAMELOOKUP_TIME'));
+    my $connect = $self->{curl_easy}->getinfo($self->{constant_cb}->(name => 'CURLINFO_CONNECT_TIME'));
+    my $appconnect = $self->{curl_easy}->getinfo($self->{constant_cb}->(name => 'CURLINFO_APPCONNECT_TIME'));
+    my $start = $self->{curl_easy}->getinfo($self->{constant_cb}->(name => 'CURLINFO_STARTTRANSFER_TIME'));
+    my $total = $self->{curl_easy}->getinfo($self->{constant_cb}->(name => 'CURLINFO_TOTAL_TIME'));
+    my $times = {
+        resolve => $resolve * 1000,
+        connect => ($connect - $resolve) * 1000,
+        transfer => ($total - $start) * 1000
+    };
+    if ($appconnect > 0) {
+        $times->{tls} = ($appconnect - $connect) * 1000;
+        $times->{processing} = ($start - $appconnect) * 1000;
+    } else {
+        $times->{processing} = ($start - $connect) * 1000;
+    }
+
+    return $times;
 }
 
 1;

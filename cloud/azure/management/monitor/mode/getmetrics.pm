@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -99,7 +99,8 @@ sub new {
         "resource-type:s"       => { name => 'resource_type' },
         "resource-namespace:s"  => { name => 'resource_namespace' },
         "metric:s@"             => { name => 'metric' },
-        "filter-dimension:s"    => { name => 'filter_dimension'}
+        "filter-dimension:s"    => { name => 'filter_dimension' },
+        "metric-namespace:s"    => { name => 'metric_namespace' }
     });
 
     return $self;
@@ -115,15 +116,15 @@ sub check_options {
     }
 
     $self->{az_resource} = $self->{option_results}->{resource};
+    $self->{az_resource_group} = $self->{option_results}->{resource_group};
+    $self->{az_resource_type} = $self->{option_results}->{resource_type};
+    $self->{az_resource_namespace} = $self->{option_results}->{resource_namespace};
 
-    if ($self->{az_resource} =~ /^\/subscriptions\/.*\/resourceGroups\/.*\/providers\/Microsoft\..*\/.*\/.*$/) {
-        $self->{az_resource_group} = '';
-        $self->{az_resource_type} = '';
-        $self->{az_resource_namespace} = '';
-    } else {
-        $self->{az_resource_group} = $self->{option_results}->{resource_group};
-        $self->{az_resource_type} = $self->{option_results}->{resource_type};
-        $self->{az_resource_namespace} = $self->{option_results}->{resource_namespace};
+    if ($self->{az_resource} =~ /^\/subscriptions\/.*\/resourceGroups\/(.*)\/providers\/(.*)\/(.*)\/(.*)$/) {
+        $self->{az_resource_group} = $1;
+        $self->{az_resource_namespace} = $2;
+        $self->{az_resource_type} = $3;
+        $self->{az_resource} = $4;
     }
 
     $self->{az_metrics} = [];
@@ -151,26 +152,30 @@ sub check_options {
     if (defined($self->{option_results}->{filter_dimension}) && $self->{option_results}->{filter_dimension} ne '') {
         $self->{az_metrics_dimension} = $self->{option_results}->{filter_dimension};
     }
+    if (defined($self->{option_results}->{metric_namespace}) && $self->{option_results}->{metric_namespace} ne '') {
+        $self->{az_metric_namespace} = $self->{option_results}->{metric_namespace};
+    }
 }
 
 sub manage_selection {
     my ($self, %options) = @_;
 
     my ($results, $raw_results) = $options{custom}->azure_get_metrics(
-        resource            => $self->{az_resource},
-        resource_group      => $self->{az_resource_group},
-        resource_type       => $self->{az_resource_type},
-        resource_namespace  => $self->{az_resource_namespace},
-        metrics             => $self->{az_metrics},
-        aggregations        => $self->{az_aggregation},
-        timeframe           => $self->{az_timeframe},
-        interval            => $self->{az_interval},
-        dimension           => $self->{az_metrics_dimension}
+        resource => $self->{az_resource},
+        resource_group => $self->{az_resource_group},
+        resource_type => $self->{az_resource_type},
+        resource_namespace => $self->{az_resource_namespace},
+        metrics => $self->{az_metrics},
+        aggregations => $self->{az_aggregation},
+        metric_namespace => $self->{az_metric_namespace},
+        timeframe => $self->{az_timeframe},
+        interval => $self->{az_interval},
+        dimension => $self->{az_metrics_dimension}
     );
 
     $self->{metrics} = {};
     foreach my $label (keys %{$results}) {
-        foreach my $aggregation (('minimum', 'maximum', 'average', 'total')) {
+        foreach my $aggregation (('minimum', 'maximum', 'average', 'total', 'count')) {
             next if (!defined($results->{$label}->{$aggregation}));
 
             $self->{metrics}->{$label . '_' . $aggregation} = {
@@ -229,6 +234,10 @@ Set resource type (Required if resource's name is used).
 =item B<--metric>
 
 Set monitor metrics (Required) (Can be multiple).
+
+=item B<--metric-namespace>
+
+Set monitor metric namespace.
 
 =item B<--filter-dimension>
 

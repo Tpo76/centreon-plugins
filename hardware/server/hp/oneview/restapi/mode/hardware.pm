@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -27,8 +27,6 @@ use warnings;
 
 sub set_system {
     my ($self, %options) = @_;
-        
-    $self->{regexp_threshold_overload_check_section_option} = '^(?:server|enclosure\.(.*))$';
 
     $self->{cb_hook2} = 'execute_custom';
 
@@ -39,7 +37,8 @@ sub set_system {
             ['critical', 'CRITICAL'],
             ['warning', 'WARNING'],
             ['unknown', 'UNKNOWN'],
-        ],
+            ['n/a', 'OK']
+        ]
     };
 
     $self->{components_path} = 'hardware::server::hp::oneview::restapi::mode::components';
@@ -50,7 +49,7 @@ sub new {
     my ($class, %options) = @_;
     my $self = $class->SUPER::new(package => __PACKAGE__, %options, no_absent => 1, no_performance => 1, force_new_perfdata => 1);
     bless $self, $class;
-    
+
     $options{options}->add_options(arguments => {});
 
     $self->{requests} = [];

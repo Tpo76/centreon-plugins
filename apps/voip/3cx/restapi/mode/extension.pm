@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -24,7 +24,8 @@ use base qw(centreon::plugins::templates::counter);
 
 use strict;
 use warnings;
-use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold catalog_status_calc);
+use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold);
+use Date::Parse;
 
 sub custom_status_output { 
     my ($self, %options) = @_;
@@ -52,18 +53,32 @@ sub set_counters {
     my ($self, %options) = @_;
 
     $self->{maps_counters_type} = [
+        { name => 'global', type => 0 },
         { name => 'extension', type => 1, cb_prefix_output => 'prefix_service_output', message_multiple => 'All extensions are ok' }
     ];
 
+    $self->{maps_counters}->{global} = [
+        { label => 'count', nlabel => '3cx.extensions.count', display_ok => 0, set => {
+                key_values => [ { name => 'count' } ],
+                output_template => 'Extensions count : %d',
+                perfdatas => [
+                    { template => '%d', min => 0 }
+                ]
+            }
+        }
+    ];
+
     $self->{maps_counters}->{extension} = [
-        { label => 'status', threshold => 0, set => {
-                key_values => [ { name => 'extension' }, { name => 'registered' }, { name => 'dnd' }, { name => 'profile' }, { name => 'status' }, { name => 'duration' } ],
-                closure_custom_calc => \&catalog_status_calc,
+        { label => 'status', type => 2, set => {
+                key_values => [
+                    { name => 'extension' }, { name => 'registered' }, { name => 'dnd' },
+                    { name => 'profile' }, { name => 'status' }, { name => 'duration' }
+                ],
                 closure_custom_output => $self->can('custom_status_output'),
                 closure_custom_perfdata => sub { return 0; },
-                closure_custom_threshold_check => \&catalog_status_threshold,
+                closure_custom_threshold_check => \&catalog_status_threshold
             }
-        },
+        }
     ];
 }
 
@@ -78,23 +93,11 @@ sub new {
     my $self = $class->SUPER::new(package => __PACKAGE__, %options, force_new_perfdata => 1);
     bless $self, $class;
 
-    $self->{version} = '1.0';
     $options{options}->add_options(arguments => {
-        'unknown-status:s'  => { name => 'unknown_status', default => '' },
-        'warning-status:s'  => { name => 'warning_status', default => '' },
-        'critical-status:s' => { name => 'critical_status', default => '' },
+        'filter-extension:s' => { name => 'filter_extension' }
     });
 
     return $self;
-}
-
-sub check_options {
-    my ($self, %options) = @_;
-    $self->SUPER::check_options(%options);
-
-    $self->change_macros(macros => [
-        'warning_status', 'critical_status', 'unknown_status',
-    ]);
 }
 
 sub manage_selection {
@@ -106,25 +109,42 @@ sub manage_selection {
         $status{$item->{Caller}} = {
             Status => $item->{Status},
             Duration => $item->{Duration},
+            EstablishedAt => $item->{EstablishedAt},
         };
         $status{$item->{Callee}} = {
             Status => $item->{Status},
             Duration => $item->{Duration},
+            EstablishedAt => $item->{EstablishedAt},
         };
     }
 
     my $extension = $options{custom}->api_extension_list();
     $self->{extension} = {};
     foreach my $item (@$extension) {
+        if (!defined($item->{_str})) { # 3CX >= 16.0.6.641
+            $item->{_str} = $item->{Number} . (length($item->{FirstName}) ? ' ' . $item->{FirstName} : '') . (length($item->{LastName}) ? ' ' . $item->{LastName} : '');
+        }
+        if (defined($self->{option_results}->{filter_extension}) && $self->{option_results}->{filter_extension} ne '' &&
+            $item->{_str} !~ /$self->{option_results}->{filter_extension}/) {
+            $self->{output}->output_add(long_msg => "skipping extension '" . $item->{_str} . "': no matching filter.", debug => 1);
+            next;
+        }
+
+        $self->{global}->{count}++;
+
         $self->{extension}->{$item->{_str}} = {
             extension => $item->{_str},
             registered => $item->{IsRegistered} ? 'true' : 'false',
             dnd => $item->{DND} ? 'true' : 'false',
             profile => $item->{CurrentProfile},
             status => $status{$item->{_str}}->{Status} ? $status{$item->{_str}}->{Status} : '',
-            duration => $status{$item->{_str}}->{Duration} && $status{$item->{_str}}->{Duration} =~ /(\d\d):(\d\d):(\d\d).*/ ? 
-                $1 * 3600 + $2 * 60 + $3 : 0
+            duration => 0
         };
+        if (defined($status{$item->{_str}}->{EstablishedAt})) { # 3CX >= 16.0.6.641 (#2020-09-08T08:26:05+00:00)
+            $self->{extension}->{$item->{_str}}->{duration} = time - Date::Parse::str2time($status{$item->{_str}}->{EstablishedAt});
+        } elsif (defined($status{$item->{_str}}->{Duration}) && $status{$item->{_str}}->{Duration} =~ /(\d\d):(\d\d):(\d\d).*/) {
+            $self->{extension}->{$item->{_str}}->{duration} = $1 * 3600 + $2 * 60 + $3;
+        }
     }
 }
 
@@ -137,6 +157,10 @@ __END__
 Check extentions status
 
 =over 8
+
+=item B<--filter-extension>
+
+Filter extension.
 
 =item B<--unknown-status>
 
@@ -152,6 +176,10 @@ Can used special variables like: %{extension}, %{registered}, %{dnd}, %{profile}
 
 Set critical threshold for status.
 Can used special variables like: %{extension}, %{registered}, %{dnd}, %{profile}, %{status}, %{duration}
+
+=item B<--warning-*> B<--critical-*>
+
+Thresholds (Can be: 'count').
 
 =back
 

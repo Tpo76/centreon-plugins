@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -25,13 +25,13 @@ use base qw(centreon::plugins::templates::counter);
 use strict;
 use warnings;
 use DateTime;
-use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold);
+use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold_ng);
 
 sub custom_status_output {
     my ($self, %options) = @_;
 
     my $msg = sprintf("expired status is '%s'", $self->{result_values}->{expired});
-    if ($self->{result_values}->{expiry_date} eq '') {
+    if ($self->{result_values}->{expiry_date} eq 'never') {
         $msg .= ', never expires';
     } else {
         $msg .= sprintf(
@@ -51,7 +51,7 @@ sub custom_status_calc {
     $self->{result_values}->{expired} = $options{new_datas}->{$self->{instance} . '_expired'};
     $self->{result_values}->{expiry_date} = $options{new_datas}->{$self->{instance} . '_expiry_date'};
     $self->{result_values}->{expiry_seconds} = $options{new_datas}->{$self->{instance} . '_expiry_seconds'};
-    $self->{result_values}->{expiry_days} = ($self->{result_values}->{expiry_seconds} ne '') ? $self->{result_values}->{expiry_seconds} / 86400 : 0;
+    $self->{result_values}->{expiry_days} = ($self->{result_values}->{expiry_seconds} ne '') ? $self->{result_values}->{expiry_seconds} / 86400 : -1;
     return 0;
 }
 
@@ -63,12 +63,12 @@ sub set_counters {
     ];
 
     $self->{maps_counters}->{features} = [
-        { label => 'status', threshold => 0, set => {
+        { label => 'status', type => 2, critical_default => '%{expired} eq "yes"', set => {
                 key_values => [ { name => 'feature' }, { name => 'expired' }, { name => 'expiry_date' }, { name => 'expiry_seconds' } ],
                 closure_custom_calc => $self->can('custom_status_calc'),
                 closure_custom_output => $self->can('custom_status_output'),
                 closure_custom_perfdata => sub { return 0; },
-                closure_custom_threshold_check => \&catalog_status_threshold,
+                closure_custom_threshold_check => \&catalog_status_threshold_ng
             }
         },
     ];
@@ -86,18 +86,10 @@ sub new {
     bless $self, $class;
 
     $options{options}->add_options(arguments => {
-        "warning-status:s"  => { name => 'warning_status', default => '' },
-        "critical-status:s" => { name => 'critical_status', default => '%{expired} eq "yes"' },
+         'filter-feature:s' => { name => 'filter_feature' }
     });
 
     return $self;
-}
-
-sub check_options {
-    my ($self, %options) = @_;
-    $self->SUPER::check_options(%options);
-
-    $self->change_macros(macros => ['warning_status', 'critical_status']);
 }
 
 sub manage_selection {
@@ -114,16 +106,22 @@ sub manage_selection {
     foreach my $feature (@{$result->{licenses}->{entry}}) {
         $feature->{expires} = lc($feature->{expires});
 
+        if (defined($self->{option_results}->{filter_feature}) && $self->{option_results}->{filter_feature} ne '' &&
+            $feature->{feature} !~ /$self->{option_results}->{filter_feature}/) {
+            $self->{output}->output_add(long_msg => "skipping  '" . $feature->{feature} . "': no matching feature.", debug => 1);
+            next;
+        }
+
         # January 30, 2022
         my $dt;
         if ($feature->{expires} =~ /^(\w+)\s+(\d+).*?(\d+)$/) {
             $dt = DateTime->new(year => $3, month => $months->{$1}, day => $2);
         }
 
-        $self->{features}->{$feature->{feature}} = {
+        $self->{features}->{ $feature->{feature} } = {
             feature => $feature->{feature},
             expired => $feature->{expired},
-            expiry_date => $feature->{expires} ne 'never' ? $feature->{expires} : '',
+            expiry_date => $feature->{expires},
             expiry_seconds => $feature->{expires} ne 'never' ?  $dt->epoch - time() : ''
         };
     }
@@ -143,6 +141,10 @@ __END__
 Check features licensing.
 
 =over 8
+
+=item B<--filter-feature>
+
+Filter license by feature (can be a regexp).
 
 =item B<--warning-status>
 

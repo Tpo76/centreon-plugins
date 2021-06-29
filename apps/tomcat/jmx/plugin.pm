@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -30,7 +30,7 @@ sub new {
     bless $self, $class;
 
     $self->{version} = '0.1';
-    %{$self->{modes}} = (
+    $self->{modes} = {
         'class-count'      => 'centreon::common::jvm::mode::classcount',
         'connector-usage'  => 'apps::tomcat::jmx::mode::connectorusage',
         'cpu-load'         => 'centreon::common::jvm::mode::cpuload',
@@ -43,10 +43,10 @@ sub new {
         'memory'           => 'centreon::common::jvm::mode::memory',
         'memory-detailed'  => 'centreon::common::jvm::mode::memorydetailed',
         'threads'          => 'centreon::common::jvm::mode::threads',
-        'webapps-sessions' => 'apps::tomcat::jmx::mode::webappssessions',
-    );
+        'webapps-sessions' => 'apps::tomcat::jmx::mode::webappssessions'
+    };
 
-    $self->{custom_modes}{jolokia} = 'centreon::common::protocols::jmx::custom::jolokia';
+    $self->{custom_modes}->{jolokia} = 'centreon::common::protocols::jmx::custom::jolokia';
     return $self;
 }
 

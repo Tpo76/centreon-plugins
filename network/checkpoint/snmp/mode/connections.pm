@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -97,7 +97,8 @@ sub run {
         value => $result->{$oid_fwNumCom},
         warning => $self->{perfdata}->get_perfdata_for_output(label => 'warning', %total_options),
         critical => $self->{perfdata}->get_perfdata_for_output(label => 'critical', %total_options),
-        min => 0
+        min => 0,
+        max => (defined($result->{$oid_fwConnTableLimit}) && $result->{$oid_fwConnTableLimit} > 0) ? $result->{$oid_fwConnTableLimit} : undef
     );
 
     $self->{output}->display();

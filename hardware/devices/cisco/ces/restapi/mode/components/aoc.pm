@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -85,18 +85,21 @@ sub check {
     $self->{components}->{aoc} = { name => 'audio output connectors', total => 0, skip => 0 };
     return if ($self->check_filter(section => 'aoc'));
 
+    # since CE 9.4
     check_aoc(
         $self,
         entry => $self->{results}->{Audio}->{Output}->{Connectors},
         element => 'HDMI',
         instance => 'item'
     );
+    # since CE 9.4
     check_aoc(
         $self,
         entry => $self->{results}->{Audio}->{Output}->{Connectors},
         element => 'InternalSpeaker',
         instance => 'item'
     );
+    # since CE 8.1
     check_aoc(
         $self,
         entry => $self->{results}->{Audio}->{Output}->{Connectors},

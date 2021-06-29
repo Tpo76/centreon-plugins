@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -49,10 +49,11 @@ sub set_counters {
 
     $self->{maps_counters_type} = [
         { name => 'global', type => 0, skipped_code => { -10 => 1 } },
+        { name => 'global_roomanalytics', type => 0, skipped_code => { -10 => 1 } },
         { name => 'global_video_incoming', cb_prefix_output => 'prefix_global_output', type => 0, skipped_code => { -10 => 1 } },
         { name => 'global_video_outgoing', cb_prefix_output => 'prefix_global_output', type => 0, skipped_code => { -10 => 1 } },
         { name => 'global_audio_incoming', cb_prefix_output => 'prefix_global_output', type => 0, skipped_code => { -10 => 1 } },
-        { name => 'global_audio_outgoing', cb_prefix_output => 'prefix_global_output', type => 0, skipped_code => { -10 => 1 } },
+        { name => 'global_audio_outgoing', cb_prefix_output => 'prefix_global_output', type => 0, skipped_code => { -10 => 1 } }
     ];
 
     $self->{maps_counters}->{global} = [
@@ -60,8 +61,19 @@ sub set_counters {
                 key_values => [ { name => 'new_calls' } ],
                 output_template => 'total calls finished: %d',
                 perfdatas => [
-                    { value => 'new_calls', template => '%d', min => 0 },
-                ],
+                    { template => '%d', min => 0 }
+                ]
+            }
+        }
+    ];
+
+    $self->{maps_counters}->{'global_roomanalytics'} = [
+        { label => 'peoplecount', nlabel => 'calls.roomanalytics.people.count', set => {
+                key_values => [ { name => 'peoplecount' } ],
+                output_template => 'people count: %s',
+                perfdatas => [
+                    { template => '%d', min => 0 }
+                ]
             }
         }
     ];
@@ -73,26 +85,26 @@ sub set_counters {
                         key_values => [ { name => 'loss' }, { name => 'pkts' }, { name => 'loss_prct' } ],
                         closure_custom_output => $self->can('custom_loss_output'),
                         perfdatas => [
-                            { value => 'loss', template => '%d', min => 0  },
-                        ],
+                            { template => '%d', min => 0  }
+                        ]
                     }
                 },
                 { label => 'packetloss-prct', nlabel => 'calls.' . $type . '.' . $direction . '.packetloss.percentage', display_ok => 0, set => {
                         key_values => [ { name => 'loss_prct' }, { name => 'loss' }, { name => 'pkts' } ],
                         closure_custom_output => $self->can('custom_loss_output'),
                         perfdatas => [
-                            { value => 'loss_prct', template => '%d', unit => '%', min => 0, max => 100 },
-                        ],
+                            { template => '%d', unit => '%', min => 0, max => 100 }
+                        ]
                     }
                 },
                 { label => 'maxjitter', nlabel => 'calls.' . $type . '.' . $direction . '.maxjitter.count', set => {
                         key_values => [ { name => 'maxjitter' } ],
                         output_template => 'max jitter: %s ms',
                         perfdatas => [
-                            { value => 'maxjitter', template => '%d', unit => 'ms', min => 0  },
-                        ],
+                            { template => '%d', unit => 'ms', min => 0  }
+                        ]
                     }
-                },
+                }
             ];
         }
     }
@@ -145,16 +157,18 @@ sub manage_selection {
     $self->{global_video_outgoing} = { loss => 0, pkts => 0, loss_prct => 0, maxjitter => 0, label => 'video outgoing' };
     $self->{global_audio_incoming} = { loss => 0, pkts => 0, loss_prct => 0, maxjitter => 0, label => 'audio incoming' };
     $self->{global_audio_outgoing} = { loss => 0, pkts => 0, loss_prct => 0, maxjitter => 0, label => 'audio outgoing' };
+    $self->{global_roomanalytics} = {};
 
     return if (!defined($result->{CallHistoryGetResult}->{Entry}));
 
     my $save_last_time = 0;
     foreach (@{$result->{CallHistoryGetResult}->{Entry}}) {
-        my $end_time = Date::Parse::str2time($_->{EndTimeUTC});
+        my $end_time_utc = ref($_->{EndTimeUTC}) eq 'HASH' ? $_->{EndTimeUTC}->{content} : $_->{EndTimeUTC};
+        my $end_time = Date::Parse::str2time($end_time_utc);
         if (!defined($end_time)) {
             $self->{output}->output_add(
                 severity => 'UNKNOWN',
-                short_msg => "can't parse date '" . $_->{EndTimeUTC} . "'"
+                short_msg => "can't parse date '" . $end_time_utc . "'"
             );
             next;
         }
@@ -164,12 +178,20 @@ sub manage_selection {
         $self->{global}->{new_calls}++;
         foreach my $type (('Video', 'Audio')) {
             foreach my $direction (('Incoming', 'Outgoing')) {
-                $self->{'global_' . lc($type) . '_' . lc($direction)}->{maxjitter}  = $_->{$type}->{$direction}->{MaxJitter}
-                    if ($self->{'global_' . lc($type) . '_' . lc($direction)}->{maxjitter} < $_->{$type}->{$direction}->{MaxJitter});
-                if ($_->{$type}->{$direction}->{PacketLoss} =~ /^(\d+)\/(\d+)/) {
+                my $max_jitter = ref($_->{$type}->{$direction}->{MaxJitter}) eq 'HASH' ? $_->{$type}->{$direction}->{MaxJitter}->{content} : $_->{$type}->{$direction}->{MaxJitter};
+                my $packet_loss = ref($_->{$type}->{$direction}->{PacketLoss}) eq 'HASH' ? $_->{$type}->{$direction}->{PacketLoss}->{content} : $_->{$type}->{$direction}->{PacketLoss};
+                $self->{'global_' . lc($type) . '_' . lc($direction)}->{maxjitter} = $max_jitter
+                    if ($self->{'global_' . lc($type) . '_' . lc($direction)}->{maxjitter} < $max_jitter);
+                if ($packet_loss =~ /^(\d+)\/(\d+)/) {
                     $self->{'global_' . lc($type) . '_' . lc($direction)}->{loss} += $1;
                     $self->{'global_' . lc($type) . '_' . lc($direction)}->{pkts} += $2;
                 }
+            }
+        }
+        if (defined($_->{RoomAnalytics}->{PeopleCount})) {
+            $self->{global_roomanalytics}->{peoplecount} = $_->{RoomAnalytics}->{PeopleCount};
+            if ($_->{RoomAnalytics}->{PeopleCount} =~ /^N\/A$/) {
+                $self->{global_roomanalytics}->{peoplecount} = 0;
             }
         }
     }
@@ -190,7 +212,7 @@ __END__
 
 =head1 MODE
 
-Check call history.
+Check call history (since TC 6.3)
 
 =over 8
 

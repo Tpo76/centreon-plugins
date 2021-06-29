@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -56,21 +56,18 @@ sub new {
             'cacert-file:s' => { name => 'cacert_file' },
             'cert-pwd:s'    => { name => 'cert_pwd' },
             'cert-pkcs12'   => { name => 'cert_pkcs12' },
-            'api-display'           => { name => 'api_display' },
-            'api-write-file:s'      => { name => 'api_write_file' },
-            'api-read-file:s'       => { name => 'api_read_file' },
-            'reload-cache-time:s'   => { name => 'reload_cache_time', default => 300 },
+            'api-display'         => { name => 'api_display' },
+            'api-write-file:s'    => { name => 'api_write_file' },
+            'api-read-file:s'     => { name => 'api_read_file' },
+            'reload-cache-time:s' => { name => 'reload_cache_time', default => 300 }
         });
     }
     $options{options}->add_help(package => __PACKAGE__, sections => 'REST API OPTIONS', once => 1);
 
     $self->{http} = centreon::plugins::http->new(%options);
-
     $self->{output} = $options{output};
-    $self->{mode} = $options{mode};
 
     return $self;
-
 }
 
 sub set_options {
@@ -79,26 +76,10 @@ sub set_options {
     $self->{option_results} = $options{option_results};
 }
 
-sub set_defaults {
-    my ($self, %options) = @_;
-
-    foreach (keys %{$options{default}}) {
-        if ($_ eq $self->{mode}) {
-            for (my $i = 0; $i < scalar(@{$options{default}->{$_}}); $i++) {
-                foreach my $opt (keys %{$options{default}->{$_}[$i]}) {
-                    if (!defined($self->{option_results}->{$opt}[$i])) {
-                        $self->{option_results}->{$opt}[$i] = $options{default}->{$_}[$i]->{$opt};
-                    }
-                }
-            }
-        }
-    }
-}
+sub set_defaults {}
 
 sub check_options {
     my ($self, %options) = @_;
-    # return 1 = ok still hostname
-    # return 0 = no hostname left
 
     $self->{hostname} = (defined($self->{option_results}->{hostname})) ? $self->{option_results}->{hostname} : undef;
 
@@ -379,8 +360,11 @@ sub api_list_services {
     my ($self, %options) = @_;
 
     my $services = {};
-    foreach my $node_name (@{$self->{node_names}}) {        
+    foreach my $node_name (@{$self->{node_names}}) {
+        # 406 or 503 - node is not part of a swarm
         my $list_tasks = $self->internal_api_list_tasks(node_name => $node_name);
+        next if ($self->{http}->get_code() == 406 || $self->{http}->get_code() == 503);
+
         my $list_services = $self->internal_api_list_services(node_name => $node_name);
         foreach my $task (@$list_tasks) {
             $services->{ $task->{ServiceID} } = {} if (!defined($services->{ $task->{ServiceID} }));

@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -22,6 +22,7 @@ package centreon::common::powershell::hyperv::2012::nodereplication;
 
 use strict;
 use warnings;
+use centreon::common::powershell::functions;
 
 sub get_powershell {
     my (%options) = @_;
@@ -29,15 +30,30 @@ sub get_powershell {
     my $ps = '
 $culture = new-object "System.Globalization.CultureInfo" "en-us"    
 [System.Threading.Thread]::CurrentThread.CurrentUICulture = $culture
+';
+
+    $ps .= centreon::common::powershell::functions::escape_jsonstring(%options);
+    $ps .= centreon::common::powershell::functions::convert_to_json(%options);
+
+    $ps .= '
 $ProgressPreference = "SilentlyContinue"
 
 Try {
     $ErrorActionPreference = "Stop"
     $vms = Get-VMReplication
 
+    $items = New-Object System.Collections.Generic.List[Hashtable];
     Foreach ($vm in $vms) {
-        Write-Host "[name=" $vm.Name "][state=" $vm.State "][health=" $vm.Health "]"
+        $item = @{}
+
+        $item.name = $vm.Name
+        $item.state = $vm.State.value__
+        $item.health = $vm.Health.value__
+        $items.Add($item)
     }
+
+    $jsonString = $items | ConvertTo-JSON-20 -forceArray $true
+    Write-Host $jsonString
 } Catch {
     Write-Host $Error[0].Exception
     exit 1

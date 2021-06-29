@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -27,30 +27,28 @@ use warnings;
 
 sub set_system {
     my ($self, %options) = @_;
-    
-    $self->{regexp_threshold_overload_check_section_option} = '^(service)$';
-    
+
     $self->{cb_hook2} = 'snmp_execute';
-    
+
     $self->{thresholds} = {
         default => [
             ['unknown', 'OK'],
             ['working', 'OK'],
             ['inactive', 'OK'],
             ['warning', 'WARNING'],
-            ['failed', 'CRITICAL'],
-        ],
+            ['failed', 'CRITICAL']
+        ]
     };
-    
+
     $self->{components_path} = 'network::infoblox::snmp::mode::components';
     $self->{components_module} = ['service'];
 }
 
 sub new {
     my ($class, %options) = @_;
-    my $self = $class->SUPER::new(package => __PACKAGE__, %options, no_absent => 1, no_load_components => 1);
+    my $self = $class->SUPER::new(package => __PACKAGE__, %options, no_absent => 1, no_load_components => 1, force_new_perfdata => 1);
     bless $self, $class;
-    
+
     $options{options}->add_options(arguments => {});
 
     return $self;
@@ -78,8 +76,8 @@ Can be: 'service'.
 
 =item B<--filter>
 
-Exclude some parts (comma seperated list)
-Can also exclude specific instance: --filter=service,fan1
+Filter component instances (syntax: component,regexp_filter). Component instances are excluded if matching regexp_filter.
+E.g: --filter=service,fan1
 
 =item B<--no-component>
 
@@ -103,7 +101,7 @@ use warnings;
 
 my %map_service_status = (
     1 => 'working', 2 => 'warning',
-    3 => 'failed', 4 => 'inactive', 5 => 'unknown',
+    3 => 'failed', 4 => 'inactive', 5 => 'unknown'
 );
 my %map_service_name = (
     1 => 'dhcp', 2 => 'dns', 3 => 'ntp', 4 => 'tftp', 5 => 'http-file-dist',
@@ -120,18 +118,18 @@ my %map_service_name = (
     49 => 'reporting', 50 => 'dns-cache-acceleration', 51 => 'ospf6',
     52 => 'swap-usage', 53 => 'discovery-consolidator', 54 => 'discovery-collector',
     55 => 'discovery-capacity', 56 => 'threat-protection', 57 => 'cloud-api',
-    58 => 'threat-analytics', 59 => 'taxii', 60 => 'bfd', 61 => 'outbound',
+    58 => 'threat-analytics', 59 => 'taxii', 60 => 'bfd', 61 => 'outbound'
 );
 
 my $mapping = {
     ibNodeServiceName   => { oid => '.1.3.6.1.4.1.7779.3.1.1.2.1.10.1.1', map => \%map_service_name },
-    ibNodeServiceStatus => { oid => '.1.3.6.1.4.1.7779.3.1.1.2.1.10.1.2', map => \%map_service_status },
+    ibNodeServiceStatus => { oid => '.1.3.6.1.4.1.7779.3.1.1.2.1.10.1.2', map => \%map_service_status }
 };
 my $oid_ibMemberNodeServiceStatusEntry = '.1.3.6.1.4.1.7779.3.1.1.2.1.10.1';
 
 sub load {
     my ($self) = @_;
-    
+
     push @{$self->{request}}, { oid => $oid_ibMemberNodeServiceStatusEntry, end => $mapping->{ibNodeServiceStatus}->{oid} };
 }
 
@@ -146,16 +144,22 @@ sub check {
         next if ($oid !~ /^$mapping->{ibNodeServiceName}->{oid}\.(.*)$/);
         my $instance = $1;
         my $result = $self->{snmp}->map_instance(mapping => $mapping, results => $self->{results}->{$oid_ibMemberNodeServiceStatusEntry}, instance => $instance);
-        
+
         next if ($self->check_filter(section => 'service', instance => $result->{ibNodeServiceName}));
-        
+
         $self->{components}->{service}->{total}++;
-        $self->{output}->output_add(long_msg => sprintf("service '%s' status is '%s' [instance = %s]",
-                                                        $result->{ibNodeServiceName}, $result->{ibNodeServiceStatus}, $result->{ibNodeServiceName}));
-        my $exit = $self->get_severity(section => 'default', instance => $result->{ibNodeServiceName}, value => $result->{ibNodeServiceStatus});
+        $self->{output}->output_add(
+            long_msg => sprintf(
+                "service '%s' status is '%s' [instance = %s]",
+                $result->{ibNodeServiceName}, $result->{ibNodeServiceStatus}, $result->{ibNodeServiceName}
+            )
+        );
+        my $exit = $self->get_severity(label => 'default', section => 'service', instance => $result->{ibNodeServiceName}, value => $result->{ibNodeServiceStatus});
         if (!$self->{output}->is_status(value => $exit, compare => 'ok', litteral => 1)) {
-            $self->{output}->output_add(severity => $exit,
-                                        short_msg => sprintf("Service '%s' status is '%s'", $result->{ibNodeServiceName}, $result->{ibNodeServiceStatus}));
+            $self->{output}->output_add(
+                severity => $exit,
+                short_msg => sprintf("Service '%s' status is '%s'", $result->{ibNodeServiceName}, $result->{ibNodeServiceStatus})
+            );
         }
     }
 }

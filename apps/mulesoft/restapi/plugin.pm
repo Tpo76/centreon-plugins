@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -30,15 +30,17 @@ sub new {
     bless $self, $class;
 
     $self->{version} = '1.0';
-    %{$self->{modes}} = (
-        'applications'        => 'apps::mulesoft::restapi::mode::applications',
-        'listapplications'    => 'apps::mulesoft::restapi::mode::listapplications',
-        'servers'             => 'apps::mulesoft::restapi::mode::servers',
-        'listservers'         => 'apps::mulesoft::restapi::mode::listservers',
-        'clusters'            => 'apps::mulesoft::restapi::mode::clusters'
-    );
+    $self->{modes} = {
+        'applications'      => 'apps::mulesoft::restapi::mode::applications',
+        'clusters'          => 'apps::mulesoft::restapi::mode::clusters',
+        'list-applications' => 'apps::mulesoft::restapi::mode::listapplications',
+        'list-queues'       => 'apps::mulesoft::restapi::mode::listqueues',
+        'list-servers'      => 'apps::mulesoft::restapi::mode::listservers',
+        'messages'          => 'apps::mulesoft::restapi::mode::messages',
+        'servers'           => 'apps::mulesoft::restapi::mode::servers'
+    };
 
-    $self->{custom_modes}{restapi} = 'apps::mulesoft::restapi::custom::api';
+    $self->{custom_modes}->{restapi} = 'apps::mulesoft::restapi::custom::api';
     return $self;
 }
 

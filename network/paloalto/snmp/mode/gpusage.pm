@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -28,14 +28,14 @@ use warnings;
 sub custom_tunnel_output {
     my ($self, %options) = @_;
 
-    my $msg = sprintf("tunnels total: %s used: %s (%.2f%%) free: %s (%.2f%%)",
+    return sprintf(
+        'tunnels total: %s used: %s (%.2f%%) free: %s (%.2f%%)',
         $self->{result_values}->{total},
         $self->{result_values}->{used},
         $self->{result_values}->{prct_used},
         $self->{result_values}->{free},
         $self->{result_values}->{prct_free}
     );
-    return $msg;
 }
 
 sub set_counters {
@@ -50,28 +50,26 @@ sub set_counters {
                 key_values => [ { name => 'used' }, { name => 'free' }, { name => 'prct_used' }, { name => 'prct_free' }, { name => 'total' } ],
                 closure_custom_output => $self->can('custom_tunnel_output'),
                 perfdatas => [
-                    { value => 'used', template => '%d', min => 0, max => 'total',
-                      cast_int => 1 },
-                ],
+                    { template => '%d', min => 0, max => 'total', cast_int => 1 }
+                ]
             }
         },
         { label => 'tunnels-usage-free', display_ok => 0, nlabel => 'globalprotect.tunnels.free.count', set => {
                 key_values => [ { name => 'free' }, { name => 'used' }, { name => 'prct_used' }, { name => 'prct_free' }, { name => 'total' } ],
                 closure_custom_output => $self->can('custom_tunnel_output'),
                 perfdatas => [
-                    { value => 'free', template => '%d', min => 0, max => 'total',
-                      cast_int => 1 },
-                ],
+                    { template => '%d', min => 0, max => 'total', cast_int => 1 }
+                ]
             }
         },
-        { label => 'tunnels-usage-prct', display_ok => 0, nlabel => 'globalprotect.tunnels.free.percentage', set => {
-                key_values => [ { name => 'prct_used' } ],
-                output_template => 'tunnels active used: %.2f %%',
+        { label => 'tunnels-usage-prct', display_ok => 0, nlabel => 'globalprotect.tunnels.usage.percentage', set => {
+                key_values => [ { name => 'prct_used' }, { name => 'used' }, { name => 'free' }, { name => 'prct_free' }, { name => 'total' } ],
+                closure_custom_output => $self->can('custom_tunnel_output'),
                 perfdatas => [
-                    { value => 'prct_used', template => '%.2f', min => 0, max => 100, unit => '%' },
-                ],
+                    { template => '%.2f', min => 0, max => 100, unit => '%' }
+                ]
             }
-        },
+        }
     ];
 }
 

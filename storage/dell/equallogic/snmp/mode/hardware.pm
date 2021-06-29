@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -27,10 +27,10 @@ use warnings;
 
 sub set_system {
     my ($self, %options) = @_;
-    
-    $self->{regexp_threshold_overload_check_section_option} = '^(fan|psu|temperature|raid|disk|health)$';
-    $self->{regexp_threshold_numeric_check_section_option} = '^(temperature|fan)$';
-    
+
+    $self->{regexp_threshold_numeric_check_section_option} = '^(?:temperature|fan)$';
+
+    $self->{cb_hook1} = 'get_system_information';
     $self->{cb_hook2} = 'snmp_execute';
     
     $self->{thresholds} = {
@@ -38,29 +38,29 @@ sub set_system {
             ['unknown', 'UNKNOWN'],
             ['normal', 'OK'],
             ['warning', 'WARNING'],
-            ['critical', 'CRITICAL'],
+            ['critical', 'CRITICAL']
         ],
         temperature => [
             ['unknown', 'UNKNOWN'],
             ['normal', 'OK'],
             ['warning', 'WARNING'],
-            ['critical', 'CRITICAL'],
+            ['critical', 'CRITICAL']
         ],
         health => [
             ['unknown', 'UNKNOWN'],
             ['normal', 'OK'],
             ['warning', 'WARNING'],
-            ['critical', 'CRITICAL'],
+            ['critical', 'CRITICAL']
         ],
         psu => [
             ['on-and-operating', 'OK'],
             ['no-ac-power', 'CRITICAL'],
-            ['failed-or-no-data', 'CRITICAL'],
+            ['failed-or-no-data', 'CRITICAL']
         ],
         'psu.fan' => [
             ['not-applicable', 'OK'],
             ['fan-is-operational', 'OK'],
-            ['fan-not-operational', 'CRITICAL'],
+            ['fan-not-operational', 'CRITICAL']
         ],
         raid => [
             ['ok', 'OK'],
@@ -70,7 +70,7 @@ sub set_system {
             ['failed', 'CRITICAL'],
             ['catastrophicLoss', 'CRITICAL'],
             ['expanding', 'OK'],
-            ['mirroring', 'OK'],
+            ['mirroring', 'OK']
         ],
         disk => [
             ['on-line', 'OK'],
@@ -82,8 +82,8 @@ sub set_system {
             ['history-of-failures', 'WARNING'],
             ['unsupported-version', 'CRITICAL'],
             ['unhealthy', 'CRITICAL'],
-            ['replacement', 'CRITICAL'],
-        ],
+            ['replacement', 'CRITICAL']
+        ]
     };
     
     $self->{components_path} = 'storage::dell::equallogic::snmp::mode::components';
@@ -94,11 +94,9 @@ sub new {
     my ($class, %options) = @_;
     my $self = $class->SUPER::new(package => __PACKAGE__, %options, no_absent => 1);
     bless $self, $class;
-    
-    $options{options}->add_options(arguments =>
-                                { 
-                                });
-    
+
+    $options{options}->add_options(arguments => {});
+
     return $self;
 }
 
@@ -116,7 +114,7 @@ sub get_member_name {
     my ($self, %options) = @_;
     
     my $name = defined($self->{results}->{$oid_eqlMemberName}->{$oid_eqlMemberName . '.' . $options{instance}}) ? 
-                $self->{results}->{$oid_eqlMemberName}->{$oid_eqlMemberName . '.' . $options{instance}} : 'unknown';
+        $self->{results}->{$oid_eqlMemberName}->{$oid_eqlMemberName . '.' . $options{instance}} : 'unknown';
     return $name;
 }
 

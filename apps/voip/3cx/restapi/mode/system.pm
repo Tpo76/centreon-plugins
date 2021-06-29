@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -24,14 +24,14 @@ use base qw(centreon::plugins::templates::counter);
 
 use strict;
 use warnings;
-use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold catalog_status_calc);
+use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold_ng);
 
 sub custom_status_output { 
     my ($self, %options) = @_;
 
     my $msg = '';
     if ($self->{result_values}->{service} !~ /^Has[A-Z]/) {
-        $msg .= 'error ';
+        $msg .= 'error';
     }
     $msg .= ': ' . $self->{result_values}->{error};
     return $msg;
@@ -48,33 +48,30 @@ sub set_counters {
     $self->{maps_counters}->{global} = [
         { label => 'calls-active', nlabel => 'system.calls.active.current', set => {
                 key_values => [ { name => 'calls_active' } ],
-                output_template => 'calls active : %s',
+                output_template => 'calls active: %s',
                 perfdatas => [
-                    { label => 'calls_active',  template => '%s', value => 'calls_active',
-                      min => 0 },
-                ],
+                    { label => 'calls_active', template => '%s', min => 0 }
+                ]
             }
         },
-         { label => 'extensions-registered', nlabel => 'system.extensions.registered.current', set => {
+        { label => 'extensions-registered', nlabel => 'system.extensions.registered.current', set => {
                 key_values => [ { name => 'extensions_registered' } ],
-                output_template => 'extensions registered : %s',
+                output_template => 'extensions registered: %s',
                 perfdatas => [
-                    { label => 'extensions_registered',  template => '%s', value => 'extensions_registered',
-                      min => 0 },
-                ],
+                    { label => 'extensions_registered', template => '%s', min => 0 }
+                ]
             }
-        },
+        }
     ];
 
     $self->{maps_counters}->{service} = [
-        { label => 'status', threshold => 0, set => {
+        { label => 'status', type => 2, critical_default => '%{error} =~ /true/', set => {
                 key_values => [ { name => 'error' }, { name => 'service' } ],
-                closure_custom_calc => \&catalog_status_calc,
                 closure_custom_output => $self->can('custom_status_output'),
                 closure_custom_perfdata => sub { return 0; },
-                closure_custom_threshold_check => \&catalog_status_threshold,
+                closure_custom_threshold_check => \&catalog_status_threshold_ng
             }
-        },
+        }
     ];
 }
 
@@ -89,23 +86,11 @@ sub new {
     my $self = $class->SUPER::new(package => __PACKAGE__, %options, force_new_perfdata => 1);
     bless $self, $class;
 
-    $self->{version} = '1.0';
     $options{options}->add_options(arguments => {
-        "unknown-status:s"  => { name => 'unknown_status', default => '' },
-        "warning-status:s"  => { name => 'warning_status', default => '' },
-        "critical-status:s" => { name => 'critical_status', default => '%{error} =~ /true/' },
+        'filter-category:s' => { name => 'filter_category' }
     });
 
     return $self;
-}
-
-sub check_options {
-    my ($self, %options) = @_;
-    $self->SUPER::check_options(%options);
-
-    $self->change_macros(macros => [
-        'warning_status', 'critical_status', 'unknown_status',
-    ]);
 }
 
 sub manage_selection {
@@ -137,9 +122,18 @@ sub manage_selection {
         service => 'HasUnregisteredSystemExtensions', 
         error => $system->{HasUnregisteredSystemExtensions} ? 'true' : 'false',
     };
+    my $updates = 0;
+    foreach my $item (@$update) {
+        if (defined($self->{option_results}->{filter_category}) && $self->{option_results}->{filter_category} ne '' &&
+            $item->{Category} !~ /$self->{option_results}->{filter_category}/) {
+            $self->{output}->output_add(long_msg => "skipping update '" . $item->{Category} . "': no matching filter.", debug => 1);
+            next;
+        }
+        $updates++;
+    }
     $self->{service}->{HasUpdatesAvailable} = {
         service => 'HasUpdatesAvailable', 
-        error => scalar(@$update) ? 'true' : 'false',
+        error => $updates ? 'true' : 'false',
     };
     
     $self->{global} = {
@@ -157,6 +151,10 @@ __END__
 Check system health
 
 =over 8
+
+=item B<--filter-category>
+
+Filter updates' category.
 
 =item B<--unknown-status>
 

@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -34,10 +34,11 @@ sub check_subpart {
 
     foreach (@{$options{entries}}) {
         my $instance = $options{enclosure} . ':' . $_->{$options{instance}};
-        
-        next if ($self->check_filter(section => 'enclosure.' . $options{section}, instance => $instance));
 
-        my $status = $_->{status};
+        next if ($self->check_filter(section => 'enclosure.' . $options{section}, instance => $instance));
+        next if ($_->{devicePresence} =~ /absent/i);
+
+        my $status = defined($_->{status}) ? $_->{status} : 'n/a';
         $self->{output}->output_add(
             long_msg => sprintf(
                 "enclosure %s '%s' status is '%s' [instance = %s]",

@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -67,7 +67,7 @@ Try {
         $returnArray += $returnObject
     }
     
-    $returnArray | ConvertTo-JSON-20
+    $returnArray | ConvertTo-JSON-20 -forceArray $true
 } Catch {
     Write-Host $Error[0].Exception
     exit 1

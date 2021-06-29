@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -23,23 +23,28 @@ package storage::synology::snmp::mode::components::disk;
 use strict;
 use warnings;
 
-my %map_disk_status = (
+my $map_disk_status = {
     1 => 'Normal',
     2 => 'Initialized',
     3 => 'NotInitialized',
     4 => 'SystemPartitionFailed',
-    5 => 'Crashed',
-);
+    5 => 'Crashed'
+};
 
 my $mapping = {
-    synoDiskdiskStatus => { oid => '.1.3.6.1.4.1.6574.2.1.1.5', map => \%map_disk_status },
+    synoDiskdiskName   => { oid => '.1.3.6.1.4.1.6574.2.1.1.2' },
+    synoDiskdiskStatus => { oid => '.1.3.6.1.4.1.6574.2.1.1.5', map => $map_disk_status }
 };
-my $oid_synoDisk = '.1.3.6.1.4.1.6574.2.1';
+my $oid_synoDisk = '.1.3.6.1.4.1.6574.2.1.1';
 
 sub load {
     my ($self) = @_;
     
-    push @{$self->{request}}, { oid => $oid_synoDisk };
+    push @{$self->{request}}, {
+        oid => $oid_synoDisk,
+        start => $mapping->{synoDiskdiskName}->{oid},
+        end => $mapping->{synoDiskdiskStatus}->{oid}
+    };
 }
 
 sub check {
@@ -57,12 +62,18 @@ sub check {
         next if ($self->check_filter(section => 'disk', instance => $instance));
         $self->{components}->{disk}->{total}++;
 
-        $self->{output}->output_add(long_msg => sprintf("disk '%s' status is %s.",
-                                    $instance, $result->{synoDiskdiskStatus}));
+        $self->{output}->output_add(
+            long_msg => sprintf(
+                "disk '%s' status is %s [instance: %s]",
+                $result->{synoDiskdiskName}, $result->{synoDiskdiskStatus}, $instance
+            )
+        );
         my $exit = $self->get_severity(section => 'disk', value => $result->{synoDiskdiskStatus});
         if (!$self->{output}->is_status(value => $exit, compare => 'ok', litteral => 1)) {
-            $self->{output}->output_add(severity => $exit,
-                                        short_msg => sprintf("Disk '%s' status is %s", $instance, $result->{synoDiskdiskStatus}));
+            $self->{output}->output_add(
+                severity => $exit,
+                short_msg => sprintf("Disk '%s' status is %s", $result->{synoDiskdiskName}, $result->{synoDiskdiskStatus})
+            );
         }
     }
 }

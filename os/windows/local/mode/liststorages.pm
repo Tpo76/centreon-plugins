@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -115,9 +115,9 @@ sub run {
             long_msg => sprintf(
                 "'%s' [size: %s][free: %s][desc: %s][type: %s]",
                 $_->{name},
-                $_->{size},
-                $_->{freespace},
-                $_->{desc},
+                defined($_->{size}) ? $_->{size} : '',
+                defined($_->{freespace}) ? $_->{freespace} : '',
+                defined($_->{desc}) ? $_->{desc} : '',
                 $map_type->{ $_->{type} }
             )
         );
@@ -145,10 +145,10 @@ sub disco_show {
     foreach (@$result) {
         $self->{output}->add_disco_entry(
             name => $_->{name},
-            size => $_->{size},
-            free => $_->{freespace},
+            size => defined($_->{size}) ? $_->{size} : '',
+            free => defined($_->{freespace}) ? $_->{freespace} : '',
             type => $map_type->{ $_->{type} },
-            desc => $_->{desc}
+            desc => defined($_->{desc}) ? $_->{desc} : ''
         );
     }
 }

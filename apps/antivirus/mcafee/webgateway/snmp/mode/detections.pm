@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -32,11 +32,11 @@ sub set_counters {
     $self->{maps_counters_type} = [
         { name => 'global', type => 0 },
         { name => 'categories', type => 1, cb_prefix_output => 'prefix_categories_output',
-          message_multiple => 'All categories are ok' },
+          message_multiple => 'All categories are ok' }
     ];
 
     $self->{maps_counters}->{global} = [
-        { label => 'malware-detected', set => {
+        { label => 'malware-detected', nlabel => 'malwares.detected.persecond', set => {
                 key_values => [ { name => 'stMalwareDetected', per_second => 1 } ],
                 output_template => 'Malware detected (per sec): %d',
                 perfdatas => [
@@ -46,7 +46,7 @@ sub set_counters {
         }
     ];
     $self->{maps_counters}->{categories} = [
-        { label => 'category', set => {
+        { label => 'category', nlabel => 'category.malwares.detected.persecond', set => {
                 key_values => [ { name => 'stCategoryCount', per_second => 1 }, { name => 'stCategoryName' } ],
                 output_template => 'detections (per sec): %d',
                 perfdatas => [
@@ -88,21 +88,18 @@ my $oid_stCategoriesEntry = '.1.3.6.1.4.1.1230.2.7.2.1.10.1';
 sub manage_selection {
     my ($self, %options) = @_;
 
-    $self->{cache_name} = "mcafee_" . $options{snmp}->get_hostname()  . '_' . $options{snmp}->get_port() . '_' . $self->{mode} . '_' .
+    $self->{cache_name} = 'mcafee_' . $options{snmp}->get_hostname()  . '_' . $options{snmp}->get_port() . '_' . $self->{mode} . '_' .
         (defined($self->{option_results}->{filter_name}) ? md5_hex($self->{option_results}->{filter_name}) : md5_hex('all')) . '_' .
         (defined($self->{option_results}->{filter_counters}) ? md5_hex($self->{option_results}->{filter_counters}) : md5_hex('all'));
 
     my $results = $options{snmp}->get_leef(oids => [ $oid_stMalwareDetected ], nothing_quit => 1);
-
     my $results2 = $options{snmp}->get_table(oid => $oid_stCategoriesEntry, nothing_quit => 1);
-    
-    $self->{global} = {};
-    $self->{categories} = {};
 
     $self->{global} = {
         stMalwareDetected => $results->{$oid_stMalwareDetected},
     };
 
+    $self->{categories} = {};
     foreach my $oid (keys %{$results2}) {
         next if ($oid !~ /^$mapping->{stCategoryName}->{oid}\.(\d+)/);
         my $instance = $1;
@@ -114,9 +111,9 @@ sub manage_selection {
             next;
         }
 
-        $self->{categories}->{$result->{stCategoryName}} = {
+        $self->{categories}->{ $result->{stCategoryName} } = {
             stCategoryName => $result->{stCategoryName},
-            stCategoryCount => $result->{stCategoryCount},
+            stCategoryCount => $result->{stCategoryCount}
         }
     }
 

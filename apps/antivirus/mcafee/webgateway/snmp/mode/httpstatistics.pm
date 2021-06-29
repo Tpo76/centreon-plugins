@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -31,11 +31,11 @@ sub set_counters {
 
     $self->{maps_counters_type} = [
         { name => 'global', type => 0 },
-        { name => 'traffics', type => 0, cb_prefix_output => 'prefix_traffic_output' },
+        { name => 'traffics', type => 0, cb_prefix_output => 'prefix_traffic_output' }
     ];
 
     $self->{maps_counters}->{global} = [
-        { label => 'requests', set => {
+        { label => 'requests', nlabel => 'http.requests.persecond', set => {
                 key_values => [ { name => 'stHttpRequests', per_second => 1 } ],
                 output_template => 'HTTP Requests (per sec): %d',
                 perfdatas => [
@@ -46,7 +46,7 @@ sub set_counters {
     ];
 
     $self->{maps_counters}->{traffics} = [
-        { label => 'client-to-proxy', set => {
+        { label => 'client-to-proxy', nlabel => 'http.traffic.client2proxy.bitspersecond', set => {
                 key_values => [ { name => 'stHttpBytesFromClient', per_second => 1 } ],
                 output_template => 'from client to proxy: %s %s/s',
                 output_change_bytes => 2,
@@ -55,7 +55,7 @@ sub set_counters {
                 ]
             }
         },
-        { label => 'server-to-proxy', set => {
+        { label => 'server-to-proxy', nlabel => 'http.traffic.server2proxy.bitspersecond', set => {
                 key_values => [ { name => 'stHttpBytesFromServer', per_second => 1 } ],
                 output_template => 'from server to proxy: %s %s/s',
                 output_change_bytes => 2,
@@ -64,7 +64,7 @@ sub set_counters {
                 ]
             }
         },
-        { label => 'proxy-to-client', set => {
+        { label => 'proxy-to-client', nlabel => 'http.traffic.proxy2client.bitspersecond', set => {
                 key_values => [ { name => 'stHttpBytesToClient', per_second => 1 } ],
                 output_template => 'from proxy to client: %s %s/s',
                 output_change_bytes => 2,
@@ -73,7 +73,7 @@ sub set_counters {
                 ]
             }
         },
-        { label => 'proxy-to-server', set => {
+        { label => 'proxy-to-server', nlabel => 'http.traffic.proxy2server.bitspersecond', set => {
                 key_values => [ { name => 'stHttpBytesToServer', per_second => 1 } ],
                 output_template => 'from proxy to server: %s %s/s',
                 output_change_bytes => 2,
@@ -111,26 +111,27 @@ my $oid_stHttpBytesToServer = '.1.3.6.1.4.1.1230.2.7.2.2.6.0';
 sub manage_selection {
     my ($self, %options) = @_;
 
-    $self->{cache_name} = "mcafee_" . $options{snmp}->get_hostname()  . '_' . $options{snmp}->get_port() . '_' . $self->{mode} . '_' .
+    $self->{cache_name} = 'mcafee_' . $options{snmp}->get_hostname()  . '_' . $options{snmp}->get_port() . '_' . $self->{mode} . '_' .
         (defined($self->{option_results}->{filter_name}) ? md5_hex($self->{option_results}->{filter_name}) : md5_hex('all')) . '_' .
         (defined($self->{option_results}->{filter_counters}) ? md5_hex($self->{option_results}->{filter_counters}) : md5_hex('all'));
 
-    my $results = $options{snmp}->get_leef(oids => [ $oid_stHttpRequests, $oid_stHttpBytesFromClient,
-                                                     $oid_stHttpBytesFromServer, $oid_stHttpBytesToClient,
-                                                     $oid_stHttpBytesToServer ], 
-                                           nothing_quit => 1);
-    
-    $self->{global} = {};
-    $self->{traffics} = {};
+    my $results = $options{snmp}->get_leef(
+        oids => [
+            $oid_stHttpRequests, $oid_stHttpBytesFromClient,
+            $oid_stHttpBytesFromServer, $oid_stHttpBytesToClient,
+            $oid_stHttpBytesToServer
+        ], 
+        nothing_quit => 1
+    );
 
     $self->{global} = {
-        stHttpRequests => $results->{$oid_stHttpRequests},
+        stHttpRequests => $results->{$oid_stHttpRequests}
     };
     $self->{traffics} = {
         stHttpBytesFromClient => $results->{$oid_stHttpBytesFromClient} * 8,
         stHttpBytesFromServer => $results->{$oid_stHttpBytesFromServer} * 8,
         stHttpBytesToClient => $results->{$oid_stHttpBytesToClient} * 8,
-        stHttpBytesToServer => $results->{$oid_stHttpBytesToServer} * 8,
+        stHttpBytesToServer => $results->{$oid_stHttpBytesToServer} * 8
     };
 }
 

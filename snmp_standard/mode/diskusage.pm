@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -34,7 +34,7 @@ sub custom_usage_output {
     my ($total_used_value, $total_used_unit) = $self->{perfdata}->change_bytes(value => $self->{result_values}->{used});
     my ($total_free_value, $total_free_unit) = $self->{perfdata}->change_bytes(value => $self->{result_values}->{free});
     return sprintf(
-        'Usage Total: %s Used: %s (%.2f%%) Free: %s (%.2f%%)',
+        'usage total: %s used: %s (%.2f%%) free: %s (%.2f%%)',
         $total_size_value . " " . $total_size_unit,
         $total_used_value . " " . $total_used_unit, $self->{result_values}->{prct_used},
         $total_free_value . " " . $total_free_unit, $self->{result_values}->{prct_free}
@@ -54,7 +54,7 @@ sub set_counters {
                 key_values => [ { name => 'count' } ],
                 output_template => 'Partitions count : %d',
                 perfdatas => [
-                    { label => 'count', value => 'count', template => '%d', min => 0 }
+                    { label => 'count', template => '%d', min => 0 }
                 ]
             }
         }
@@ -65,7 +65,7 @@ sub set_counters {
                 key_values => [ { name => 'used' }, { name => 'free' }, { name => 'prct_used' }, { name => 'prct_free' }, { name => 'total' }, { name => 'display' } ],
                 closure_custom_output => $self->can('custom_usage_output'),
                 perfdatas => [
-                    { label => 'used', value => 'used', template => '%d', min => 0, max => 'total',
+                    { label => 'used', template => '%d', min => 0, max => 'total',
                       unit => 'B', cast_int => 1, label_extra_instance => 1, instance_use => 'display' }
                 ]
             }
@@ -74,25 +74,25 @@ sub set_counters {
                 key_values => [ { name => 'free' }, { name => 'used' }, { name => 'prct_used' }, { name => 'prct_free' }, { name => 'total' }, { name => 'display' } ],
                 closure_custom_output => $self->can('custom_usage_output'),
                 perfdatas => [
-                    { label => 'free', value => 'free', template => '%d', min => 0, max => 'total',
+                    { label => 'free', template => '%d', min => 0, max => 'total',
                       unit => 'B', cast_int => 1, label_extra_instance => 1, instance_use => 'display' }
                 ]
             }
         },
         { label => 'usage-prct', display_ok => 0, nlabel => 'storage.space.usage.percentage', set => {
                 key_values => [ { name => 'prct_used' }, { name => 'display' } ],
-                output_template => 'Used : %.2f %%',
+                output_template => 'used: %.2f %%',
                 perfdatas => [
-                    { label => 'used_prct', value => 'prct_used', template => '%.2f', min => 0, max => 100,
+                    { label => 'used_prct', template => '%.2f', min => 0, max => 100,
                       unit => '%', label_extra_instance => 1, instance_use => 'display' }
                 ]
             }
         },
         { label => 'inodes', nlabel => 'storage.inodes.usage.percentage', set => {
                 key_values => [ { name => 'inodes' }, { name => 'display' } ],
-                output_template => 'Inodes Used: %s %%',
+                output_template => 'Inodes used: %s %%',
                 perfdatas => [
-                    { label => 'inodes', value => 'inodes', template => '%d',
+                    { label => 'inodes', template => '%d',
                       unit => '%', min => 0, max => 100, label_extra_instance => 1, instance_use => 'display' }
                 ]
             }
@@ -111,22 +111,25 @@ sub new {
     my $self = $class->SUPER::new(package => __PACKAGE__, %options);
     bless $self, $class;
     
-    $options{options}->add_options(arguments => { 
-        'units:s'                 => { name => 'units', default => '%' },
+    $options{options}->add_options(arguments => {
+        'disk-index:s'            => { name => 'disk_index' },
+        'filter-disk-path:s'      => { name => 'filter_disk_path' },
+        'filter-disk-device:s'    => { name => 'filter_disk_device' },
+        'units:s'                 => { name => 'units', default => '' },
         'free'                    => { name => 'free' },
         'reload-cache-time:s'     => { name => 'reload_cache_time', default => 180 },
-        'name'                    => { name => 'use_name' },
-        'diskpath:s'              => { name => 'diskpath' },
-        'regexp'                  => { name => 'use_regexp' },
-        'regexp-isensitive'       => { name => 'use_regexpi' },
+        'name'                    => { name => 'use_name' }, # legacy
+        'diskpath:s'              => { name => 'diskpath' }, # legacy
+        'regexp'                  => { name => 'use_regexp' }, # legacy
+        'regexp-isensitive'       => { name => 'use_regexpi' }, # legacy
         'display-transform-src:s' => { name => 'display_transform_src' },
         'display-transform-dst:s' => { name => 'display_transform_dst' },
         'show-cache'              => { name => 'show_cache' },
         'space-reservation:s'     => { name => 'space_reservation' },
-        'force-use-mib-percent'   => { name => 'force_use_mib_percent' }
+        'force-use-mib-percent'   => { name => 'force_use_mib_percent' },
+        'force-counters32'        => { name => 'force_counters32' }
     });
 
-    $self->{diskpath_id_selected} = [];
     $self->{statefile_cache} = centreon::plugins::statefile->new(%options);
 
     return $self;
@@ -168,19 +171,30 @@ my $mapping = {
 sub manage_selection {
     my ($self, %options) = @_;
     
-    $self->get_selection(snmp => $options{snmp});
+    my $disks = $self->get_selection(snmp => $options{snmp});
+
+    delete($mapping->{dskPercent}) if (!defined($self->{option_results}->{force_use_mib_percent}));
+    if (!defined($self->{option_results}->{force_counters32})) {
+        delete($mapping->{dskTotal32});
+        delete($mapping->{dskUsed32});
+    } else {
+        delete($mapping->{dskTotalLow});
+        delete($mapping->{dskTotalHigh});
+        delete($mapping->{dskUsedLow});
+        delete($mapping->{dskUsedHigh});
+    }
 
     $options{snmp}->load(
         oids => [ map($_->{oid}, values(%$mapping)) ],
-        instances => $self->{diskpath_id_selected},
+        instances => [keys %$disks],
         nothing_quit => 1
     );
     my $snmp_result = $options{snmp}->get_leef();
 
     $self->{global}->{count} = 0;
     $self->{diskpath} = {};
-    foreach (sort @{$self->{diskpath_id_selected}}) {
-        my $name_diskpath = $self->get_display_value(id => $_);
+    foreach (keys %$disks) {
+        my $name_diskpath = $self->get_display_value(value => $disks->{$_}->[0]);
 
         my $result = $options{snmp}->map_instance(mapping => $mapping, results => $snmp_result, instance => $_);
         if (!defined($result->{dskTotal32}) && !defined($result->{dskTotalHigh})) {
@@ -239,24 +253,33 @@ sub reload_cache {
     my $datas = {};
 
     $datas->{last_timestamp} = time();
-    $datas->{all_ids} = [];
+    $datas->{disks} = {};
 
+    my $oid_dskEntry = '.1.3.6.1.4.1.2021.9.1';
     my $oid_dskPath = '.1.3.6.1.4.1.2021.9.1.2';
+    my $oid_dskDevice = '.1.3.6.1.4.1.2021.9.1.3';
 
-    my $result = $options{snmp}->get_table(oid => $oid_dskPath);
+    my $result = $options{snmp}->get_table(
+        oid => $oid_dskEntry,
+        start => $oid_dskPath,
+        end => $oid_dskDevice
+    );
+
     foreach my $key (keys %$result) {
-        next if ($key !~ /\.([0-9]+)$/);        
-        my $diskpath_index = $1;
-        push @{$datas->{all_ids}}, $diskpath_index;
-        $datas->{"dskPath_" . $diskpath_index} = $self->{output}->to_utf8($result->{$key});
+        next if ($key !~ /$oid_dskPath\.([0-9]+)$/);
+        $datas->{disks}->{$1} = [
+            $self->{output}->decode($result->{$key}),
+            $self->{output}->decode($result->{$oid_dskDevice . '.' . $1})
+        ];
     }
 
-    if (scalar(@{$datas->{all_ids}}) <= 0) {
+    if (scalar(keys %{$datas->{disks}}) <= 0) {
         $self->{output}->add_option_msg(short_msg => "Can't construct cache...");
         $self->{output}->option_exit();
     }
 
     $self->{statefile_cache}->write(data => $datas);
+    return $datas->{disks};
 }
 
 sub get_selection {
@@ -270,47 +293,57 @@ sub get_selection {
     }
 
     my $timestamp_cache = $self->{statefile_cache}->get(name => 'last_timestamp');
-    if ($has_cache_file == 0 || !defined($timestamp_cache) || ((time() - $timestamp_cache) > (($self->{option_results}->{reload_cache_time}) * 60))) {
-            $self->reload_cache(snmp => $options{snmp});
-            $self->{statefile_cache}->read();
+    my $disks = $self->{statefile_cache}->get(name => 'disks');
+    if ($has_cache_file == 0 || !defined($timestamp_cache) || !defined($disks) || ((time() - $timestamp_cache) > (($self->{option_results}->{reload_cache_time}) * 60))) {
+        $disks = $self->reload_cache(snmp => $options{snmp});
+        $self->{statefile_cache}->read();
     }
 
-    my $all_ids = $self->{statefile_cache}->get(name => 'all_ids');
-    if (!defined($self->{option_results}->{use_name}) && defined($self->{option_results}->{diskpath})) {
-        # get by ID
-        my $name = $self->{statefile_cache}->get(name => 'dskPath_' . $self->{option_results}->{diskpath});
-        push @{$self->{diskpath_id_selected}}, $self->{option_results}->{diskpath} if (defined($name));
-    } else {
-        foreach my $i (@{$all_ids}) {
-            my $filter_name = $self->{statefile_cache}->get(name => 'dskPath_' . $i);
-            next if (!defined($filter_name));
-            
-            if (!defined($self->{option_results}->{diskpath})) {
-                push @{$self->{diskpath_id_selected}}, $i;
-                next;
-            }
-            if (defined($self->{option_results}->{use_regexp}) && defined($self->{option_results}->{use_regexpi}) && $filter_name =~ /$self->{option_results}->{diskpath}/i) {
-                push @{$self->{diskpath_id_selected}}, $i;
-            }
-            if (defined($self->{option_results}->{use_regexp}) && !defined($self->{option_results}->{use_regexpi}) && $filter_name =~ /$self->{option_results}->{diskpath}/) {
-                push @{$self->{diskpath_id_selected}}, $i;
-            }
-            if (!defined($self->{option_results}->{use_regexp}) && !defined($self->{option_results}->{use_regexpi}) && $filter_name eq $self->{option_results}->{diskpath}) {
-                push @{$self->{diskpath_id_selected}}, $i;
-            }
+    my $select_index = !defined($self->{option_results}->{use_name}) && defined($self->{option_results}->{diskpath}) && defined($self->{option_results}->{diskpath}) ne '' ?
+        $self->{option_results}->{diskpath} : undef;
+    $select_index = $self->{option_results}->{disk_index}
+        if (defined($self->{option_results}->{disk_index}) && defined($self->{option_results}->{disk_index}) ne '');
+
+    my $filter_path = defined($self->{option_results}->{use_name}) && defined($self->{option_results}->{diskpath}) && $self->{option_results}->{diskpath} ne '' ? 
+        $self->{option_results}->{diskpath} : undef;
+    $filter_path = '^' . $filter_path . '$'
+        if (defined($filter_path) && !defined($self->{option_results}->{use_regexp}));
+    $filter_path = '(?i)' . $filter_path 
+        if (defined($filter_path) && defined($self->{option_results}->{use_regexp}) && defined($self->{option_results}->{use_regexpi}));
+    $filter_path = $self->{option_results}->{filter_disk_path}
+        if (defined($self->{option_results}->{filter_disk_path}) && defined($self->{option_results}->{filter_disk_path}) ne '');
+
+    my $results = {};
+    foreach (keys %$disks) {
+        if (defined($select_index) && $select_index ne $_) {
+            $self->{output}->output_add(long_msg => "skipping '" . $disks->{$_}->[0] . "': no matching filter.", debug => 1);
+            next;
         }
+        if (defined($filter_path) && $disks->{$_}->[0] !~ /$filter_path/) {
+            $self->{output}->output_add(long_msg => "skipping '" . $disks->{$_}->[0] . "': no matching filter.", debug => 1);
+            next;
+        }
+        if (defined($self->{option_results}->{filter_disk_device}) && $self->{option_results}->{filter_disk_device} ne '' &&
+            $disks->{$_}->[1] !~ /$self->{option_results}->{filter_disk_device}/) {
+            $self->{output}->output_add(long_msg => "skipping '" . $disks->{$_}->[1] . "': no matching filter.", debug => 1);
+            next;
+        }
+
+        $results->{$_} = $disks->{$_};
     }
 
-    if (scalar(@{$self->{diskpath_id_selected}}) <= 0) {
+    if (scalar(keys %$results) <= 0) {
         $self->{output}->add_option_msg(short_msg => "No disk path found. Can be: filters, cache file.");
         $self->{output}->option_exit();
     }
+
+    return $results;
 }
 
 sub get_display_value {
     my ($self, %options) = @_;
-    my $value = $self->{statefile_cache}->get(name => 'dskPath_' . $options{id});
 
+    my $value = $options{value};
     if (defined($self->{option_results}->{display_transform_src})) {
         $self->{option_results}->{display_transform_dst} = '' if (!defined($self->{option_results}->{display_transform_dst}));
         eval "\$value =~ s{$self->{option_results}->{display_transform_src}}{$self->{option_results}->{display_transform_dst}}";
@@ -334,25 +367,17 @@ Need to enable "includeAllDisks 10%" on snmpd.conf.
 
 Filter counters to be displayed (Can be: 'usage', 'count', 'inodes').
 
-=item B<--warning-*> B<--critical-*>
+=item B<--disk-index>
 
-Thresholds (Can be: 'usage', 'usage-free', 'usage-prct', 'inodes', 'count').
+Choose disk according to the index.
 
-=item B<--diskpath>
+=item B<--filter-disk-path>
 
-Set the disk path (number expected) ex: 1, 2,... (empty means 'check all disk path').
+Filter disks according to their path.
 
-=item B<--name>
+=item B<--filter-disk-device>
 
-Allows to use disk path name with option --diskpath instead of disk path oid index.
-
-=item B<--regexp>
-
-Allows to use regexp to filter disk path (with option --name).
-
-=item B<--regexp-isensitive>
-
-Allows to use regexp non case-sensitive (with --regexp).
+Filter disks according to their device name.
 
 =item B<--reload-cache-time>
 
@@ -378,6 +403,14 @@ The value is in percent of total (Default: none) (results like 'df' command).
 =item B<--force-use-mib-percent>
 
 Can be used if you have counters overload by big disks.
+
+=item B<--force-counters32>
+
+Force to use 32 bits counters. Should be used when 64 bits high/low components are not available.
+
+=item B<--warning-*> B<--critical-*>
+
+Thresholds (Can be: 'usage', 'usage-free', 'usage-prct', 'inodes', 'count').
 
 =back
 

@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -24,13 +24,12 @@ use base qw(centreon::plugins::templates::counter);
 
 use strict;
 use warnings;
-use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold);
+use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold_ng);
 
 sub custom_status_output {
     my ($self, %options) = @_;
 
-    my $msg = 'accessible ' . $self->{result_values}->{accessible};
-    return $msg;
+    return 'accessible ' . $self->{result_values}->{accessible};
 }
 
 sub custom_usage_output {
@@ -85,38 +84,40 @@ sub set_counters {
     ];
 
     $self->{maps_counters}->{datastore} = [
-        { label => 'status', threshold => 0, set => {
+        {
+            label => 'status', type => 2, unknown_default => '%{accessible} !~ /^true|1$/i',
+            set => {
                 key_values => [ { name => 'accessible' }, { name => 'display' } ],
                 closure_custom_output => $self->can('custom_status_output'),
                 closure_custom_perfdata => sub { return 0; },
-                closure_custom_threshold_check => \&catalog_status_threshold,
+                closure_custom_threshold_check => \&catalog_status_threshold_ng
             }
         },
         { label => 'usage', nlabel => 'datastore.space.usage.bytes', set => {
-                key_values => [ { name => 'used_space' }, { name => 'free_space' }, { name => 'prct_used_space' }, { name => 'prct_free_space' }, { name => 'total_space' }, { name => 'display' },  ],
+                key_values => [ { name => 'used_space' }, { name => 'free_space' }, { name => 'prct_used_space' }, { name => 'prct_free_space' }, { name => 'total_space' }, { name => 'display' } ],
                 closure_custom_output => $self->can('custom_usage_output'),
                 perfdatas => [
-                    { label => 'used', value => 'used_space', template => '%d', min => 0, max => 'total_space',
-                      unit => 'B', cast_int => 1, label_extra_instance => 1, instance_use => 'display' },
-                ],
+                    { label => 'used', template => '%d', min => 0, max => 'total_space',
+                      unit => 'B', cast_int => 1, label_extra_instance => 1, instance_use => 'display' }
+                ]
             }
         },
         { label => 'usage-free', nlabel => 'datastore.space.free.bytes', display_ok => 0, set => {
-                key_values => [ { name => 'free_space' }, { name => 'used_space' }, { name => 'prct_used_space' }, { name => 'prct_free_space' }, { name => 'total_space' }, { name => 'display' },  ],
+                key_values => [ { name => 'free_space' }, { name => 'used_space' }, { name => 'prct_used_space' }, { name => 'prct_free_space' }, { name => 'total_space' }, { name => 'display' } ],
                 closure_custom_output => $self->can('custom_usage_output'),
                 perfdatas => [
-                    { label => 'free', value => 'free_space', template => '%d', min => 0, max => 'total_space',
-                      unit => 'B', cast_int => 1, label_extra_instance => 1, instance_use => 'display' },
-                ],
+                    { label => 'free', template => '%d', min => 0, max => 'total_space',
+                      unit => 'B', cast_int => 1, label_extra_instance => 1, instance_use => 'display' }
+                ]
             }
         },
         { label => 'usage-prct', nlabel => 'datastore.space.usage.percentage', display_ok => 0, set => {
-                key_values => [ { name => 'prct_used_space' }, { name => 'display' } ],
-                output_template => 'used : %.2f %%',
+                key_values => [ { name => 'prct_used_space' }, { name => 'free_space' }, { name => 'used_space' }, { name => 'prct_free_space' }, { name => 'total_space' }, { name => 'display' } ],
+                closure_custom_output => $self->can('custom_usage_output'),
                 perfdatas => [
-                    { label => 'used_prct', value => 'prct_used_space', template => '%.2f', min => 0, max => 100,
-                      unit => '%', label_extra_instance => 1, instance_use => 'display' },
-                ],
+                    { label => 'used_prct', template => '%.2f', min => 0, max => 100,
+                      unit => '%', label_extra_instance => 1, instance_use => 'display' }
+                ]
             }
         },
         { label => 'provisioned', nlabel => 'datastore.space.provisioned.bytes', set => {
@@ -126,8 +127,8 @@ sub set_counters {
                 threshold_use => 'prct_uncommitted',
                 perfdatas => [
                     { label => 'provisioned', value => 'total_uncommitted', template => '%s', unit => 'B', 
-                      min => 0, max => 'total_space', label_extra_instance => 1 },
-                ],
+                      min => 0, max => 'total_space', label_extra_instance => 1 }
+                ]
             }
         }
     ];
@@ -148,13 +149,11 @@ sub new {
         'datastore-name:s'   => { name => 'datastore_name' },
         'filter'             => { name => 'filter' },
         'scope-datacenter:s' => { name => 'scope_datacenter' },
-        'units:s'            => { name => 'units', default => '%' },
-        'free'               => { name => 'free' },
-        'unknown-status:s'   => { name => 'unknown_status', default => '%{accessible} !~ /^true|1$/i' },
-        'warning-status:s'   => { name => 'warning_status', default => '' },
-        'critical-status:s'  => { name => 'critical_status', default => '' }
+        'filter-host:s'      => { name => 'filter_host' },
+        'units:s'            => { name => 'units', default => '' },
+        'free'               => { name => 'free' }
     });
-    
+
     return $self;
 }
 
@@ -174,12 +173,6 @@ sub check_options {
     );
 
     $self->SUPER::check_options(%options);
-
-    $self->change_macros(macros => ['unknown_status', 'warning_status', 'critical_status']);
-    if (!defined($self->{option_results}->{units}) || $self->{option_results}->{units} !~ /^(%|B)$/) {
-        $self->{output}->add_option_msg(short_msg => "Wrong units option '" . $self->{option_results}->{units} . "'.");
-        $self->{output}->option_exit();
-    }
 }
 
 sub custom_usage_calc {
@@ -204,13 +197,23 @@ sub custom_usage_calc {
 sub manage_selection {
     my ($self, %options) = @_;
 
-    $self->{datastore} = {};
     my $response = $options{custom}->execute(
         params => $self->{option_results},
         command => 'datastoreusage'
     );
+
+    $self->{datastore} = {};
     foreach my $ds_id (keys %{$response->{data}}) {
         my $ds_name = $response->{data}->{$ds_id}->{name};
+
+        if (defined($response->{data}->{$ds_id}->{hosts}) && defined($self->{option_results}->{filter_host}) && $self->{option_results}->{filter_host} ne '') {
+            my $filtered = 0;
+            foreach (@{$response->{data}->{$ds_id}->{hosts}}) {
+                $filtered = 1 if (/$self->{option_results}->{filter_host}/);
+            }
+            next if ($filtered == 0);
+        }
+
         if ($response->{data}->{$ds_id}->{size} <= 0) {
             $self->{output}->output_add(long_msg => "skipping datastore '" . $ds_name . "': no total size");
             next;
@@ -250,6 +253,10 @@ Datastore name is a regexp.
 =item B<--scope-datacenter>
 
 Search in following datacenter(s) (can be a regexp).
+
+=item B<--filter-host>
+
+Filter datastores attached to hosts (can be a regexp).
 
 =item B<--unknown-status>
 

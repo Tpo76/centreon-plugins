@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -27,7 +27,7 @@ use hardware::server::dell::idrac::snmp::mode::components::resources qw(%map_sta
 my $mapping = {
     systemBatteryStateSettings  => { oid => '.1.3.6.1.4.1.674.10892.5.4.600.50.1.4', map => \%map_state },
     systemBatteryStatus         => { oid => '.1.3.6.1.4.1.674.10892.5.4.600.50.1.5', map => \%map_status },
-    systemBatteryLocationName   => { oid => '.1.3.6.1.4.1.674.10892.5.4.600.50.1.7' },
+    systemBatteryLocationName   => { oid => '.1.3.6.1.4.1.674.10892.5.4.600.50.1.7' }
 };
 my $oid_systemBatteryTableEntry = '.1.3.6.1.4.1.674.10892.5.4.600.50.1';
 
@@ -37,7 +37,7 @@ sub load {
     push @{$self->{request}}, {
         oid => $oid_systemBatteryTableEntry,
         start => $mapping->{systemBatteryStateSettings}->{oid},
-        start => $mapping->{systemBatteryLocationName}->{oid}
+        end => $mapping->{systemBatteryLocationName}->{oid}
     };
 }
 

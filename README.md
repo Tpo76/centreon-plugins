@@ -1,8 +1,13 @@
 # centreon-plugins
 
 [![License](https://img.shields.io/badge/License-APACHE2-brightgreen.svg)](https://github.com/centreon/centreon-plugins/blob/master/LICENSE.txt)
-[![GitHub stars](https://img.shields.io/github/stars/centreon/centreon-plugins.svg)](https://github.com/centreon/centreon-plugins/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/centreon/centreon-plugins.svg)](https://github.com/centreon/centreon-plugins/network)
+
+<!-- SHIELDS -->
+[![Contributors][contributors-shield]][contributors-url]
+[![Stars][stars-shield]][stars-url]
+[![Forks][forks-shield]][forks-url]
+[![Issues][issues-shield]][issues-url]
+
 
 “centreon-plugins” is a free and open source project to monitor systems. The project can be used with Centreon and all monitoring softwares compatible with Nagios plugins.
 
@@ -74,4 +79,15 @@ I can set threshold with options ``--warning`` and ``--critical``:
     $ perl centreon_plugins.pl --plugin=os::linux::snmp::plugin --mode=load --hostname=127.0.0.1 --snmp-version=2c --snmp-community=public --warning=1,2,3 --critical=2,3,4
     OK: Load average: 0.00, 0.00, 0.00 | 'load1'=0.00;0:1;0:2;0; 'load5'=0.00;0:2;0:3;0; 'load15'=0.00;0:3;0:4;0;
 
-For more information or help, please read 'user/guide.rst' or go to https://docs.centreon.com/docs/centreon-plugins/en/latest/
+For more information or help, please read 'doc/en/user/guide.rst'.
+
+<!-- URL AND IMAGES FOR SHIELDS -->
+[contributors-shield]: https://img.shields.io/github/contributors/centreon/centreon-plugins?color=%2384BD00&label=CONTRIBUTORS&style=for-the-badge
+[stars-shield]: https://img.shields.io/github/stars/centreon/centreon-plugins?color=%23433b02a&label=STARS&style=for-the-badge
+[forks-shield]: https://img.shields.io/github/forks/centreon/centreon-plugins?color=%23009fdf&label=FORKS&style=for-the-badge
+[issues-shield]: https://img.shields.io/github/issues/centreon/centreon-plugins?color=%230072ce&label=ISSUES&style=for-the-badge
+
+[contributors-url]: https://github.com/centreon/centreon-plugins/graphs/contributors
+[forks-url]: https://github.com/centreon/centreon-plugins/network/members
+[stars-url]: https://github.com/centreon/centreon-plugins/stargazers
+[issues-url]: https://github.com/centreon/centreon-plugins/issues

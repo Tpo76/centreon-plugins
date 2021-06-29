@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -26,7 +26,7 @@ use strict;
 use warnings;
 use centreon::plugins::misc;
 use DateTime;
-use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold);
+use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold_ng);
 
 sub custom_status_output {
     my ($self, %options) = @_;
@@ -46,6 +46,7 @@ sub custom_last_perfdata {
     
     $self->{output}->perfdata_add(
         label => 'last_server_update',
+        nlabel => $self->{nlabel},
         value => $self->{result_values}->{diff},
         unit => 's',
         min => 0
@@ -58,8 +59,8 @@ sub custom_last_threshold {
     my $exit = $self->{perfdata}->threshold_check(
         value => $self->{result_values}->{diff},
         threshold => [
-            { label => 'critical-' . $self->{label}, exit_litteral => 'critical' },
-            { label => 'warning-' . $self->{label}, exit_litteral => 'warning' }
+            { label => 'critical-' . $self->{thlabel}, exit_litteral => 'critical' },
+            { label => 'warning-' . $self->{thlabel}, exit_litteral => 'warning' }
         ]
     );
     return $exit;
@@ -104,15 +105,20 @@ sub set_counters {
     ];
 
     $self->{maps_counters}->{global} = [
-        { label => 'status', set => {
+        { 
+            label => 'status',
+            type => 2,
+            warning_default => '%{status} =~ /Warning/i',
+            critical_default => '%{status} =~ /Critical/i',
+            set => {
                 key_values => [ { name => 'updatesStatus' } ],
                 closure_custom_calc => $self->can('custom_status_calc'),
                 closure_custom_output => $self->can('custom_status_output'),
                 closure_custom_perfdata => sub { return 0; },
-                closure_custom_threshold_check => \&catalog_status_threshold
+                closure_custom_threshold_check => \&catalog_status_threshold_ng
             }
         },
-        { label => 'last-server-update', set => {
+        { label => 'last-server-update', nlabel => 'update.server.freshness.seconds', set => {
                 key_values => [ { name => 'lastServerUpdateTime' } ],
                 closure_custom_calc => $self->can('custom_last_calc'),
                 closure_custom_output => $self->can('custom_last_output'),
@@ -120,15 +126,22 @@ sub set_counters {
                 closure_custom_perfdata => $self->can('custom_last_perfdata')
             }
         },
-        { label => 'not-updated', set => {
+        { label => 'not-updated', nlabel => 'update.hosts.outdated.count', set => {
                 key_values => [ { name => 'hostsNotUpdated' } ],
                 output_template => '%d host(s) not up to date',
                 perfdatas => [
-                    { label => 'not_updated', value => 'hostsNotUpdated', template => '%d', min => 0 }
+                    { label => 'not_updated', template => '%d', min => 0 }
                 ]
             }
         }
     ];
+}
+
+sub check_options {	
+    my ($self, %options) = @_;	
+    $self->SUPER::check_options(%options);	
+
+    $self->{tz} = centreon::plugins::misc::set_timezone(name => $self->{option_results}->{timezone});	
 }
 
 sub new {
@@ -137,20 +150,10 @@ sub new {
     bless $self, $class;
 
     $options{options}->add_options(arguments => {
-        'warning-status:s'  => { name => 'warning_status', default => '%{status} =~ /Warning/i' },
-        'critical-status:s' => { name => 'critical_status', default => '%{status} =~ /Critical/i' },
-        'timezone:s'        => { name => 'timezone', default => 'GMT' }
+        'timezone:s' => { name => 'timezone', default => 'GMT' }
     });
 
     return $self;
-}
-
-sub check_options {
-    my ($self, %options) = @_;
-    $self->SUPER::check_options(%options);
-
-    $self->{tz} = centreon::plugins::misc::set_timezone(name => $self->{option_results}->{timezone});
-    $self->change_macros(macros => ['warning_status', 'critical_status']);
 }
 
 my $map_status = {

@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -28,6 +28,11 @@ use Digest::MD5 qw(md5_hex);
 
 sub custom_traffic_calc {
     my ($self, %options) = @_;
+
+    if (!defined($options{delta_time})) {
+        $self->{error_msg} = 'Buffer creation';
+        return -1;
+    }
 
     my $total_bytes = 0;
     foreach (keys %{$options{new_datas}}) {
@@ -125,8 +130,8 @@ sub set_counters {
                 output_use => 'traffic_per_seconds',  threshold_use => 'traffic_per_seconds',
                 perfdatas => [
                     { value => 'traffic_per_seconds', template => '%d',
-                      unit => 'B/s', min => 0, label_extra_instance => 1, instance_use => 'display'  },
-                ],
+                      unit => 'B/s', min => 0, label_extra_instance => 1, instance_use => 'display'  }
+                ]
             }
         },
         { label => 'channels-maxjitter', nlabel => 'call.channels.maxjitter.milliseconds', set => {
@@ -137,8 +142,8 @@ sub set_counters {
                 output_use => 'max_jitter',  threshold_use => 'max_jitter',
                 perfdatas => [
                     { value => 'max_jitter', template => '%d',
-                      unit => 'ms', min => 0, label_extra_instance => 1, instance_use => 'display'  },
-                ],
+                      unit => 'ms', min => 0, label_extra_instance => 1, instance_use => 'display'  }
+                ]
             }
         },
         { label => 'channels-packetloss', nlabel => 'call.channels.packetloss.count', set => {
@@ -149,8 +154,8 @@ sub set_counters {
                 threshold_use => 'packets_loss',
                 perfdatas => [
                     { value => 'packets_loss', template => '%d',
-                      min => 0, label_extra_instance => 1, instance_use => 'display'  },
-                ],
+                      min => 0, label_extra_instance => 1, instance_use => 'display'  }
+                ]
             }
         },
         { label => 'channels-packetloss-prct', nlabel => 'call.channels.packetloss.percentage', display_ok => 0, set => {
@@ -161,10 +166,10 @@ sub set_counters {
                 threshold_use => 'packets_loss_prct',
                 perfdatas => [
                     { value => 'packets_loss_prct', template => '%.2f',
-                      unit => '%', min => 0, max => 100, label_extra_instance => 1, instance_use => 'display'  },
-                ],
+                      unit => '%', min => 0, max => 100, label_extra_instance => 1, instance_use => 'display'  }
+                ]
             }
-        },
+        }
     ];
 }
 
@@ -199,6 +204,16 @@ sub manage_selection {
         $self->{channels}->{$_} = { display => $_ };
     }
 
+    if (!defined($result->{version}) || $result->{version} !~ /^(?:CE|TC)(\d+\.\d+)/i) {
+        $self->{output}->add_option_msg(short_msg => 'cannot find firmware version');
+        $self->{output}->option_exit();
+    }
+    my ($version_major, $version_minor) = split(/\./, $1);
+    if (($version_major < 8) || ($version_major == 8 && $version_minor < 3)) {
+        $self->{output}->add_option_msg(short_msg => 'firmware version is too old (' . $version_major . '.' . $version_minor . ')');
+        $self->{output}->option_exit();
+    }
+
     return if (!defined($result->{MediaChannels}->{Call}));
 
     foreach my $call (@{$result->{MediaChannels}->{Call}}) {
@@ -221,7 +236,7 @@ __END__
 
 =head1 MODE
 
-Check call channels in real-time.
+Check call channels in real-time (since CE 8.3)
 
 =over 8
 

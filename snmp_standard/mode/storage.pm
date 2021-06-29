@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -236,6 +236,7 @@ sub new {
         'display-transform-dst:s' => { name => 'display_transform_dst' },
         'show-cache'              => { name => 'show_cache' },
         'space-reservation:s'     => { name => 'space_reservation' },
+        'filter-duplicate'        => { name => 'filter_duplicate' },
         'filter-storage-type:s'   => { name => 'filter_storage_type', default => $self->default_storage_type() },
         'add-access'              => { name => 'add_access' },
     });
@@ -348,11 +349,24 @@ sub manage_selection {
             next;
         }
         
+        if (defined($self->{option_results}->{filter_duplicate})) {
+            my $duplicate = 0;
+            foreach my $entry (values %{$self->{storage}}) {
+                if (($entry->{allocation_units} == $result->{$oid_hrStorageAllocationUnits . '.' . $_}) &&
+                    ($entry->{size} == $result->{$oid_hrStorageSize . "." . $_}) &&
+                    ($entry->{used} == $result->{$oid_hrStorageUsed . "." . $_})) {
+                    $duplicate = 1;
+                    last;
+                }
+            }                
+            next if ($duplicate == 1);
+        }
+
         $self->{storage}->{$_} = {
             display => $name_storage,
-            allocation_units => $result->{$oid_hrStorageAllocationUnits . "." . $_},
-            size => $result->{$oid_hrStorageSize . "." . $_},
-            used => $result->{$oid_hrStorageUsed . "." . $_},
+            allocation_units => $result->{$oid_hrStorageAllocationUnits . '.' . $_},
+            size => $result->{$oid_hrStorageSize . '.' . $_},
+            used => $result->{$oid_hrStorageUsed . '.' . $_},
             access => defined($access_result->{$_}) ? $access_result->{$_} : undef,
         };
         $self->{global}->{count}++;
@@ -406,7 +420,7 @@ sub reload_cache {
                 push @{$datas->{all_ids}}, $storage_index;
             }
 
-            $datas->{$$_[1] . "_" . $storage_index} = $self->{output}->to_utf8($result->{ $oids_hrStorageTable{$$_[1]} }->{$key});
+            $datas->{$$_[1] . "_" . $storage_index} = $self->{output}->decode($result->{ $oids_hrStorageTable{$$_[1]} }->{$key});
         }
     }
     
@@ -580,6 +594,10 @@ Display cache storage datas.
 
 Some filesystem has space reserved (like ext4 for root).
 The value is in percent of total (Default: none) (results like 'df' command).
+
+=item B<--filter-duplicate>
+
+Filter duplicate storages (in used size and total size).
 
 =item B<--filter-storage-type>
 

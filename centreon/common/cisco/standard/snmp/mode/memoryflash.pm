@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -207,7 +207,7 @@ Can used special variables like: %{status}, %{display}
 Set critical threshold for status (Default: '').
 Can used special variables like: %{status}, %{display}
 
-=item B<--warning-*> B<--critical-usage>
+=item B<--warning-*> B<--critical-*>
 
 Thresholds.
 Can be: 'usage' (B), 'usage-free' (B), 'usage-prct' (%).

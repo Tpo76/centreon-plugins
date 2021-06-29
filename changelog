@@ -1,3 +1,106 @@
+2021-05-20 Quentin Garnier <qgarnier@centreon.com>
+ * Plugin added: Azure MySQL
+ * Plugin added: Azure EventGrid
+ * Plugin added: Azure ServiceBus
+ * Plugin added: Azure AutomationAccount
+ * Plugin added: Azure SignalR
+ * Plugin added: Azure FrontDoor
+ * Plugin added: Azure App Service
+ * Plugin added: Azure EventHub
+ * Plugin added: Azure Functions
+ * Plugin added: Azure Application Gateway
+ * Plugin added: Azure Application Insights
+ * Plugin added: Azure Cosmos DB
+ * Plugin added: Azure App Service Plan
+ * Plugin added: Cisco WAP SNMP
+ * Plugin added: Huawei OceanStor SNMP
+ * Plugin added: Proxmox MG API
+ * Plugin added: Ubiquiti Unifi SNMP
+ * Core: secure plugins options
+ * Core: use package Pod::Simple::Search
+ * Mode added: [linux/local] 'check-plugin'
+ * Mode added: [protocol/snmp] 'collection'
+ * Mode added: [veeam] 'licenses'
+
+2021-02-18 Quentin Garnier <qgarnier@centreon.com>
+ * Plugin added: Google Cloud CloudSQL MySQL
+ * Plugin added: Google Cloud Storage
+ * Plugin added: Azure Load Balancer
+ * Plugin added: Azure Firewall
+ * Plugin added: Azure Public IPs
+ * Plugin added: Azure Key Vaults
+ * Plugin added: Notification Jasmin SMS
+ * Plugin added: Athonet ePC SNMP
+ * Plugin added: Meru SNMP
+ * Plugin added: Ubiquiti Airfiber SNMP
+ * Plugin added: EMC PPMA Rest API
+ * Plugin added: DenyALL SNMP
+ * Mode added: [cisco/standard/snmp] 'aaa-servers'
+ * Break: refactoring for protocol x509
+
+2021-01-13 Quentin Garnier <qgarnier@centreon.com>
+ * Plugin added: Hitachi HCP SNMP
+ * Plugin added: Aruba AOS-CX Rest API
+ * Plugin added: Aruba AOS-CX SNMP
+ * Plugin added: Fortinet Fortiauthenticator SNMP
+ * Plugin added: Cisco DNAC Rest API
+ * Plugin added: Oracle OVM Rest API
+ * Plugin added: Cisco Firepower FMC API
+ * Plugin added: Cisco Firepower Fxos SNMP
+ * Plugin added: Rubrik Rest API
+ * Plugin added: AWS SES
+ * Plugin added: AWS TransitGateway
+ * Plugin added: Commvault Commserve Rest API
+ * Plugin added: Alyvix Rest API
+ * Plugin added: SmarterMail Rest API
+ * Plugin added: Cyberpower UPS SNMP
+ * Plugin added: Cyberpower PDU SNMP
+ * Plugin added: Cisco CTS SNMP
+ * Plugin added: Microsoft DHCP SNMP
+ * Plugin added: FiberStore SNMP
+ * Plugin added: Socomec NetVision SNMP
+ * Plugin added: HMS Ewon SNMP
+ * Plugin added: GSuite
+ * Plugin added: RRDtool
+ * Plugin added: Notification Microsoft Teams 
+ * Core: add option --insecure for backend http
+ * Core: option --list-plugin working with Par::Packer
+ * Mode added: [cisco/standard/snmp] 'vpc'
+ * Mode added: [emc/celerra/local] 'filesystems'
+ * Mode added: [emc/celerra/local] 'pools'
+ * Mode added: [synology/snmp] 'upgrade'
+ * Mode added: [mikrotik/snmp] 'firmware'
+ * Break: move microsoft applications
+
+2020-10-08 Quentin Garnier <qgarnier@centreon.com>
+ * Plugin added: Cisco CUCM SXML
+ * Plugin added: DRBD
+ * Plugin added: Pexip Infinity Management API
+ * Plugin added: Polycom RPRM SNMP
+ * Plugin added: Polycom DMA SNMP
+ * Plugin added: Polycom HDX SNMP
+ * Plugin added: Aws SQS
+ * Plugin added: Aws SNS
+
+2020-08-03 Quentin Garnier <qgarnier@centreon.com>
+ * Plugin added: Netapp Ontap Rest API
+ * Plugin added: Netdata Rest API
+ * Plugin added: Gorgone Rest API
+ * Plugin added: Nimble Rest API
+ * Plugin added: Cisco SSMS Rest API
+ * Plugin added: Loggly
+ * Plugin added: Nginx Plus Rest API
+ * Plugin added: IP-Label newtest Rest API
+ * Plugin added: Aws Health
+ * Core: add option --no-component-count (#2062)
+ * Core: can use unknown thresholds for counter modes
+ * Mode added: [cisco/standard/snmp] 'vss'
+ * Mode added: [paloalto/standard/snmp] 'signatures'
+ * Mode added: [checkpoint/snmp] 'ra-users'
+ * Break: [linux/local] refactoring
+ * Break: [iis/local] refactoring
+ * Break: [ansible/tower] refactoring
+
 2020-06-02 Quentin Garnier <qgarnier@centreon.com>
  * Plugin added: pfsense FauxAPI
  * Plugin added: IIS Rest API

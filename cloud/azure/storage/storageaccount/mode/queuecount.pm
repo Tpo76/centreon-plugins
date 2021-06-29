@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -176,13 +176,13 @@ Set resource name or id (Required).
 
 Set resource group (Required if resource's name is used).
 
-=item B<--warning-queuecount-$aggregation$>
+=item B<--warning-queuecount-*>
 
-Thresholds warning ($aggregation$ can be: 'average', 'total').
+Thresholds warning (* can be: 'average', 'total').
 
-=item B<--critical-queuecount-$aggregation$>
+=item B<--critical-queuecount-*>
 
-Thresholds critical ($aggregation$ can be: 'average', 'total').
+Thresholds critical (* can be: 'average', 'total').
 
 =back
 

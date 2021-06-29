@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -30,7 +30,7 @@ sub new {
     bless $self, $class;
 
     $self->{version} = '1.0';
-    %{$self->{modes}} = (
+    $self->{modes} = {
         'bgp-peer-state'             => 'network::juniper::common::junos::mode::bgppeerstate',
         'bgp-peer-prefix-statistics' => 'network::juniper::common::junos::mode::bgppeerprefixstatistics',
         'cpu'                        => 'network::juniper::common::junos::mode::cpu',
@@ -43,8 +43,8 @@ sub new {
         'list-storages'              => 'snmp_standard::mode::liststorages',
         'memory'                     => 'network::juniper::common::junos::mode::memory',
         'rsvp-session-status'        => 'network::juniper::common::junos::mode::rsvpsessionstatus',
-        'storage'                    => 'snmp_standard::mode::storage',
-    );
+        'storage'                    => 'snmp_standard::mode::storage'
+    };
 
     return $self;
 }

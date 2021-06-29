@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -32,9 +32,19 @@ sub set_counters {
         { name => 'edges', type => 3, cb_prefix_output => 'prefix_edge_output', cb_long_output => 'long_output',
           message_multiple => 'All edges categories usage are ok', indent_long_output => '    ',
             group => [
+                { name => 'global', type => 0 },
                 { name => 'categories', display_long => 1, cb_prefix_output => 'prefix_category_output',
-                  message_multiple => 'All categories usage are ok', type => 1 },
+                  message_multiple => 'All categories usage are ok', type => 1 }
             ]
+        }
+    ];
+
+    $self->{maps_counters}->{global} = [
+        { label => 'edge-categories-count', nlabel => 'edge.categories.total.count', set => {
+                key_values => [ { name => 'category_count' } ],
+                output_template => '%s categorie(s)',
+                perfdatas => [ { template => '%d', unit => '', min => 0, label_extra_instance => 1 } ]
+            }
         }
     ];
 
@@ -44,9 +54,8 @@ sub set_counters {
                 output_change_bytes => 2,
                 output_template => 'Traffic In: %s %s/s',
                 perfdatas => [
-                    { value => 'traffic_in', template => '%s',
-                      min => 0, unit => 'b/s', label_extra_instance => 1 },
-                ],
+                    { template => '%s', min => 0, unit => 'b/s', label_extra_instance => 1 }
+                ]
             }
         },
         { label => 'traffic-out', nlabel => 'category.traffic.out.bitspersecond', set => {
@@ -54,29 +63,26 @@ sub set_counters {
                 output_change_bytes => 2,
                 output_template => 'Traffic Out: %s %s/s',
                 perfdatas => [
-                    { value => 'traffic_out', template => '%s',
-                      min => 0, unit => 'b/s', label_extra_instance => 1 },
-                ],
+                    { template => '%s', min => 0, unit => 'b/s', label_extra_instance => 1 }
+                ]
             }
         },
         { label => 'packets-in', nlabel => 'category.packets.in.persecond', set => {
                 key_values => [ { name => 'packets_in' }, { name => 'display' }, { name => 'id' } ],
                 output_template => 'Packets In: %.2f packets/s',
                 perfdatas => [
-                    { value => 'packets_in', template => '%.2f',
-                      min => 0, unit => 'packets/s', label_extra_instance => 1 },
-                ],
+                    { template => '%.2f', min => 0, unit => 'packets/s', label_extra_instance => 1 }
+                ]
             }
         },
         { label => 'packets-out', nlabel => 'category.packets.out.persecond', set => {
                 key_values => [ { name => 'packets_out' }, { name => 'display' }, { name => 'id' } ],
                 output_template => 'Packets Out: %.2f packets/s',
                 perfdatas => [
-                    { value => 'packets_out', template => '%.2f',
-                      min => 0, unit => 'packets/s', label_extra_instance => 1 },
-                ],
+                    { template => '%.2f', min => 0, unit => 'packets/s', label_extra_instance => 1 }
+                ]
             }
-        },
+        }
     ];
 }
 
@@ -105,9 +111,7 @@ sub new {
 
     $options{options}->add_options(arguments => {
         'filter-edge-name:s'     => { name => 'filter_edge_name' },
-        'filter-category-name:s' => { name => 'filter_category_name' },
-        'warning-status:s'       => { name => 'warning_status', default => '' },
-        'critical-status:s'      => { name => 'critical_status', default => '' },
+        'filter-category-name:s' => { name => 'filter_category_name' }
     });
 
     return $self;
@@ -118,14 +122,12 @@ sub check_options {
     $self->SUPER::check_options(%options);
 
     $self->{timeframe} = defined($self->{option_results}->{timeframe}) ? $self->{option_results}->{timeframe} : 900;
-
-    $self->change_macros(macros => ['warning_status', 'critical_status']);
 }
 
 sub manage_selection {
     my ($self, %options) = @_;
 
-    my $results = $options{custom}->list_edges;
+    my $results = $options{custom}->list_edges();
 
     $self->{edges} = {};
     foreach my $edge (@{$results}) {
@@ -147,10 +149,11 @@ sub manage_selection {
             if (defined($self->{option_results}->{filter_category_name}) &&
                 $self->{option_results}->{filter_category_name} ne '' &&
                 $category->{name} !~ /$self->{option_results}->{filter_category_name}/) {
-                $self->{output}->output_add(long_msg => "skipping '" . $edge->{id} . "'.", debug => 1);
+                $self->{output}->output_add(long_msg => "skipping '" . $category->{name} . "'.", debug => 1);
                 next;
             }
 
+            $self->{edges}->{$edge->{name}}->{global}->{category_count}++;
             $self->{edges}->{$edge->{name}}->{categories}->{$category->{name}} = {
                 id => $category->{category},
                 display => $category->{name},
@@ -189,7 +192,7 @@ Filter category by name (Can be a regexp).
 =item B<--warning-*> B<--critical-*>
 
 Thresholds.
-Can be: 'traffic-in', 'traffic-out',
+Can be: 'edge-categories-count', 'traffic-in', 'traffic-out',
 'packets-in', 'packets-out'.
 
 =back

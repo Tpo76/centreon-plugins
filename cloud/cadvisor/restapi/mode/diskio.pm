@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -34,47 +34,47 @@ sub set_counters {
     ];
     
     $self->{maps_counters}->{containers_diskio} = [
-        { label => 'diskio-read', set => {
+        { label => 'diskio-read', nlabel => 'disk.io.read.bytespersecond', set => {
                 key_values => [ { name => 'diskio_read' }, { name => 'display' } ],
                 output_change_bytes => 1,
                 output_template => 'Disk IO Read: %s %s/s',
                 perfdatas => [
-                    { label => 'diskio_read', value => 'diskio_read', template => '%.2f',
-                      min => 0, unit => 'B/s', label_extra_instance => 1, instance_use => 'display' },
-                ],
+                    { label => 'diskio_read', template => '%.2f',
+                      min => 0, unit => 'B/s', label_extra_instance => 1, instance_use => 'display' }
+                ]
             }
         },
-        { label => 'diskio-write', set => {
+        { label => 'diskio-write', nlabel => 'disk.io.write.bytespersecond', set => {
                 key_values => [ { name => 'diskio_write' }, { name => 'display' } ],
                 output_change_bytes => 1,
                 output_template => 'Disk IO Write: %s %s/s',
                 perfdatas => [
-                    { label => 'diskio_write', value => 'diskio_write', template => '%.2f',
-                      min => 0, unit => 'B/s', label_extra_instance => 1, instance_use => 'display' },
-                ],
+                    { label => 'diskio_write', template => '%.2f',
+                      min => 0, unit => 'B/s', label_extra_instance => 1, instance_use => 'display' }
+                ]
             }
-        },
+        }
     ];
 }
 
 sub new {
     my ($class, %options) = @_;
-    my $self = $class->SUPER::new(package => __PACKAGE__, %options);
+    my $self = $class->SUPER::new(package => __PACKAGE__, %options, force_new_perfdata => 1);
     bless $self, $class;
     
-    $options{options}->add_options(arguments =>
-                                {
-                                  "container-id:s"              => { name => 'container_id' },
-                                  "container-name:s"            => { name => 'container_name' },
-                                  "filter-name:s"               => { name => 'filter_name' },
-                                  "use-name"                    => { name => 'use_name' },
-                                });
-   
+    $options{options}->add_options(arguments => {
+        'container-id:s'   => { name => 'container_id' },
+        'container-name:s' => { name => 'container_name' },
+        'filter-name:s'    => { name => 'filter_name' },
+        'use-name'         => { name => 'use_name' }
+    });
+
     return $self;
 }
 
 sub prefix_containers_diskio_output {
     my ($self, %options) = @_;
+
     return "Container '" . $options{instance_value}->{display} . "' ";
 }
 
@@ -112,38 +112,39 @@ sub manage_selection {
         my $read_io = {};
         my $write_io = {};
 
-
-        $self->{containers}->{$container_id} = {
-            node_name           => $result->{$container_id}->{NodeName},
-            display             => defined($self->{option_results}->{use_name}) ? $name : $container_id,
-            name                => $name,
-       };
-       # The API does not present the devices in the same order between the first and the last stats sample, so we can't just compare [0] with [0] and [1] with [1], we have to check the name of the device
-       foreach my $diskio_index (0..(scalar(@{$first_stat->{diskio}->{io_service_bytes}}) - 1)) {
-            my $name = defined($self->{option_results}->{use_name}) ? $name : $container_id;
-            my $device = $first_stat->{diskio}->{io_service_bytes}->[$diskio_index]->{device};
-            $name .= ':' . $device;
-            $read_io->{$name} = {first => $first_stat->{diskio}->{io_service_bytes}->[$diskio_index]->{stats}->{Read}};
-            $write_io->{$name} = {first => $first_stat->{diskio}->{io_service_bytes}->[$diskio_index]->{stats}->{Write}};
-        }
-       foreach my $diskio_index (0..(scalar(@{$last_stat->{diskio}->{io_service_bytes}}) - 1)) {
-            my $name = defined($self->{option_results}->{use_name}) ? $name : $container_id;
-            my $device = $last_stat->{diskio}->{io_service_bytes}->[$diskio_index]->{device};
-            $name .= ':' . $device;
-            $read_io->{$name}->{last} = $last_stat->{diskio}->{io_service_bytes}->[$diskio_index]->{stats}->{Read};
-            $write_io->{$name}->{last} = $last_stat->{diskio}->{io_service_bytes}->[$diskio_index]->{stats}->{Write};
-        }
-        foreach my $diskio_disk (keys %$read_io) {
-            $self->{containers_diskio}->{$diskio_disk} = {
-                display         => $diskio_disk,
-                diskio_read     => ($read_io->{$diskio_disk}->{last} - $read_io->{$diskio_disk}->{first}) / $diff_ts ,
-                diskio_write    => ($write_io->{$diskio_disk}->{last} - $write_io->{$diskio_disk}->{first}) / $diff_ts,
+        if (keys $first_stat->{diskio}) {
+            $self->{containers}->{$container_id} = {
+                node_name           => $result->{$container_id}->{NodeName},
+                display             => defined($self->{option_results}->{use_name}) ? $name : $container_id,
+                name                => $name,
             };
+            # The API does not present the devices in the same order between the first and the last stats sample, so we can't just compare [0] with [0] and [1] with [1], we have to check the name of the device
+            foreach my $diskio_index (0..(scalar(@{$first_stat->{diskio}->{io_service_bytes}}) - 1)) {
+                my $name = defined($self->{option_results}->{use_name}) ? $name : $container_id;
+                my $device = $first_stat->{diskio}->{io_service_bytes}->[$diskio_index]->{device};
+                $name .= ':' . $device;
+                $read_io->{$name} = {first => $first_stat->{diskio}->{io_service_bytes}->[$diskio_index]->{stats}->{Read}};
+                $write_io->{$name} = {first => $first_stat->{diskio}->{io_service_bytes}->[$diskio_index]->{stats}->{Write}};
+            }
+            foreach my $diskio_index (0..(scalar(@{$last_stat->{diskio}->{io_service_bytes}}) - 1)) {
+                my $name = defined($self->{option_results}->{use_name}) ? $name : $container_id;
+                my $device = $last_stat->{diskio}->{io_service_bytes}->[$diskio_index]->{device};
+                $name .= ':' . $device;
+                $read_io->{$name}->{last} = $last_stat->{diskio}->{io_service_bytes}->[$diskio_index]->{stats}->{Read};
+                $write_io->{$name}->{last} = $last_stat->{diskio}->{io_service_bytes}->[$diskio_index]->{stats}->{Write};
+            }
+            foreach my $diskio_disk (keys %$read_io) {
+                $self->{containers_diskio}->{$diskio_disk} = {
+                    display         => $diskio_disk,
+                    diskio_read     => ($read_io->{$diskio_disk}->{last} - $read_io->{$diskio_disk}->{first}) / $diff_ts ,
+                    diskio_write    => ($write_io->{$diskio_disk}->{last} - $write_io->{$diskio_disk}->{first}) / $diff_ts,
+                };
+            }
         }
     }
-    
+
     if (scalar(keys %{$self->{containers}}) <= 0) {
-        $self->{output}->add_option_msg(short_msg => "No containers found.");
+        $self->{output}->add_option_msg(short_msg => "No containers found or no data available for diskio metrics.");
         $self->{output}->option_exit();
     }
     

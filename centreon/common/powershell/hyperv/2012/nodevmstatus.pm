@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -22,6 +22,7 @@ package centreon::common::powershell::hyperv::2012::nodevmstatus;
 
 use strict;
 use warnings;
+use centreon::common::powershell::functions;
 
 sub get_powershell {
     my (%options) = @_;
@@ -29,6 +30,12 @@ sub get_powershell {
     my $ps = '
 $culture = new-object "System.Globalization.CultureInfo" "en-us"    
 [System.Threading.Thread]::CurrentThread.CurrentUICulture = $culture
+';
+
+    $ps .= centreon::common::powershell::functions::escape_jsonstring(%options);
+    $ps .= centreon::common::powershell::functions::convert_to_json(%options);
+
+    $ps .= '
 $ProgressPreference = "SilentlyContinue"
 
 Try {
@@ -41,16 +48,29 @@ Try {
             $node_is_clustered = 1
         }
     } Catch {
-    }   
+    }
+
+    $items = New-Object System.Collections.Generic.List[Hashtable];
     Foreach ($vm in $vms) {
+        $item = @{}
+
         $note = $vm.Notes -replace "\r",""
         $note = $note -replace "\n"," - "
-        $isClustered = $vm.IsClustered
+        
+        $item.name = $vm.VMName
+        $item.state = $vm.State.value__
+        $item.status = $vm.Status
+        $item.note = $note
+        $item.is_clustered = $vm.IsClustered
         if ($node_is_clustered -eq 0) {
-            $isClustered = "nodeNotClustered"
+            $item.is_clustered = $false
         }
-        Write-Host "[name=" $vm.VMName "][state=" $vm.State "][status=" $vm.Status "][IsClustered=" $isClustered "][note=" $note "]"
+
+        $items.Add($item)
     }
+
+    $jsonString = $items | ConvertTo-JSON-20 -forceArray $true
+    Write-Host $jsonString
 } Catch {
     Write-Host $Error[0].Exception
     exit 1

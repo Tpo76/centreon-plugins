@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and server monitoring for
@@ -24,10 +24,11 @@ use base qw(centreon::plugins::templates::counter);
 
 use strict;
 use warnings;
-use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold catalog_status_calc);
+use centreon::plugins::templates::catalog_functions qw(catalog_status_threshold);
 
 sub custom_status_output {
     my ($self, %options) = @_;
+
     return sprintf('Id: %s, Status: %s', $self->{result_values}->{id}, $self->{result_values}->{status});
 }
 
@@ -42,20 +43,20 @@ sub set_counters {
     $self->{maps_counters}->{global} = [
         { label => 'total', nlabel => 'mulesoft.servers.total.count', set => {
                 key_values      => [ { name => 'total' }  ],
-                output_template => 'Total : %s',
-                perfdatas       => [ { value => 'total', template => '%d', min => 0 } ]
+                output_template => '%s',
+                perfdatas       => [ { template => '%d', min => 0 } ]
             }
         },
         { label => 'running', nlabel => 'mulesoft.servers.status.running.count', set => {
                 key_values      => [ { name => 'running' }  ],
-                output_template => 'Running : %s',
-                perfdatas       => [ { value => 'running', template => '%d', min => 0 } ]
+                output_template => 'running : %s',
+                perfdatas       => [ { template => '%d', min => 0 } ]
             }
         },
         { label => 'disconnected', nlabel => 'mulesoft.servers.status.disconnected.count', set => {
                 key_values      => [ { name => 'disconnected' }  ],
-                output_template => 'Disconnected : %s',
-                perfdatas       => [ { value => 'disconnected', template => '%d', min => 0 } ]
+                output_template => 'disconnected : %s',
+                perfdatas       => [ { template => '%d', min => 0 } ]
             }
         }
    ];
@@ -63,7 +64,6 @@ sub set_counters {
     $self->{maps_counters}->{servers} = [
         { label => 'status', threshold => 0, set => {
             key_values => [ { name => 'id' }, { name => 'status' }, { name => 'name'}, { name => 'display' } ],
-                closure_custom_calc => \&catalog_status_calc,
                 closure_custom_output => $self->can('custom_status_output'),
                 closure_custom_perfdata => sub { return 0; },
                 closure_custom_threshold_check => \&catalog_status_threshold
@@ -96,7 +96,7 @@ sub check_options {
 sub prefix_global_output {
     my ($self, %options) = @_;
 
-    return "Total servers ";
+    return 'Total servers :';
 }
 
 sub prefix_server_output {
@@ -110,7 +110,9 @@ sub manage_selection {
 
     $self->{global} = { started => 0, stopped => 0, failed => 0 };
     $self->{servers} = {};
-    my $result = $options{custom}->list_servers();
+    my $result = $options{custom}->list_objects(api_type => 'arm', endpoint => '/servers');
+    foreach ('running', 'disconnected') { $self->{global}->{$_} = 0; };
+
     foreach my $server (@{$result}) {
         next if ( defined($self->{option_results}->{filter_name})
             && $self->{option_results}->{filter_name} ne ''

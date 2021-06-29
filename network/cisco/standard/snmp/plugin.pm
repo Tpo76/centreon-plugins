@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -30,7 +30,8 @@ sub new {
     bless $self, $class;
 
     $self->{version} = '1.0';
-    %{$self->{modes}} = (
+    $self->{modes} = {
+        'aaa-servers'         => 'centreon::common::cisco::standard::snmp::mode::aaaservers',
         'arp'                 => 'snmp_standard::mode::arp',
         'configuration'       => 'centreon::common::cisco::standard::snmp::mode::configuration',
         'cpu'                 => 'centreon::common::cisco::standard::snmp::mode::cpu',
@@ -38,6 +39,7 @@ sub new {
         'hsrp'                => 'centreon::common::cisco::standard::snmp::mode::hsrp',
         'interfaces'          => 'centreon::common::cisco::standard::snmp::mode::interfaces', 
         'ipsla'               => 'centreon::common::cisco::standard::snmp::mode::ipsla',
+        'list-aaa-servers'    => 'centreon::common::cisco::standard::snmp::mode::listaaaservers',
         'list-interfaces'     => 'snmp_standard::mode::listinterfaces',
         'list-spanning-trees' => 'snmp_standard::mode::listspanningtrees',
         'load'                => 'centreon::common::cisco::standard::snmp::mode::load',
@@ -48,8 +50,10 @@ sub new {
         'stack'               => 'centreon::common::cisco::standard::snmp::mode::stack',
         'uptime'              => 'snmp_standard::mode::uptime',
         'voice-call'          => 'centreon::common::cisco::standard::snmp::mode::voicecall',
+        'vpc'                 => 'centreon::common::cisco::standard::snmp::mode::vpc',
+        'vss'                 => 'centreon::common::cisco::standard::snmp::mode::vss',
         'wan3g'               => 'centreon::common::cisco::standard::snmp::mode::wan3g'
-    );
+    };
 
     return $self;
 }

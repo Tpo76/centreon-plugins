@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -34,16 +34,16 @@ sub new {
     bless $self, $class;
     
     $options{options}->add_options(arguments => {
-        "subnet:s"              => { name => 'subnet' },
-        "snmp-port:s"           => { name => 'snmp_port', default => 161 },
-        "snmp-version:s@"       => { name => 'snmp_version' },
-        "snmp-community:s@"     => { name => 'snmp_community' },
-        "snmp-timeout:s"        => { name => 'snmp_timeout', default => 1 },
-        "prettify"              => { name => 'prettify' },
+        'subnet:s'          => { name => 'subnet' },
+        'snmp-port:s'       => { name => 'snmp_port', default => 161 },
+        'snmp-version:s@'   => { name => 'snmp_version' },
+        'snmp-community:s@' => { name => 'snmp_community' },
+        'snmp-timeout:s'    => { name => 'snmp_timeout', default => 1 },
+        'prettify'          => { name => 'prettify' }
     });
-    
+
     $self->{snmp} = centreon::plugins::snmp->new(%options, noptions => 1);
-                                
+
     return $self;
 }
 
@@ -95,6 +95,7 @@ my $lookup_type = [
     { type => 'macos', re => qr/Darwin/i },
     { type => 'hp-ux', re => qr/HP-UX/i },
     { type => 'freebsd', re => qr/FreeBSD/i },
+    { type => 'aix', re => qr/ AIX / },
 ];
 
 sub define_type {

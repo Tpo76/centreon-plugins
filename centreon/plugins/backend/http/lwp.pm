@@ -1,5 +1,5 @@
 #
-# Copyright 2020 Centreon (http://www.centreon.com/)
+# Copyright 2021 Centreon (http://www.centreon.com/)
 #
 # Centreon is a full-fledged industry-strength solution that meets
 # the needs in IT infrastructure and application monitoring for
@@ -51,7 +51,7 @@ sub check_options {
 
     foreach (('unknown_status', 'warning_status', 'critical_status')) {
         if (defined($options{request}->{$_})) {
-            $options{request}->{$_} =~ s/%\{http_code\}/\$self->{response}->code/g;
+            $options{request}->{$_} =~ s/%\{http_code\}/\$values->{code}/g;
         }
     }
 
@@ -70,6 +70,10 @@ sub check_options {
         push @{$options{request}->{ssl_opt}}, 'SSL_ca_file => "' . $options{request}->{cacert_file} . '"'
             if (defined($options{request}->{cacert_file}));
     }
+    if ($options{request}->{insecure}) {
+        push @{$options{request}->{ssl_opt}}, 'SSL_verify_mode => SSL_VERIFY_NONE';
+    }
+
     my $append = '';
     foreach (@{$options{request}->{ssl_opt}}) {
         if ($_ ne '') {
@@ -120,12 +124,25 @@ sub set_proxy {
 sub request {
     my ($self, %options) = @_;
 
+    my %user_agent_params = (keep_alive => 1);
+    if (defined($options{request}->{certinfo}) && $options{request}->{certinfo} == 1) {
+        centreon::plugins::misc::mymodule_load(
+            output => $self->{output}, module => 'LWP::ConnCache',
+            error_msg => "Cannot load module 'LWP::ConnCache'."
+        );
+        $self->{cache} = LWP::ConnCache->new();
+        $self->{cache}->total_capacity(1);
+        %user_agent_params = (conn_cache => $self->{cache});
+    }
+
     my $request_options = $options{request};
     if (!defined($self->{ua})) {
+        my $timeout;
+        $timeout = $1 if (defined($request_options->{timeout}) && $request_options->{timeout} =~ /(\d+)/);
         $self->{ua} = centreon::plugins::backend::http::useragent->new(
-            keep_alive => 1,
+            %user_agent_params,
             protocols_allowed => ['http', 'https'], 
-            timeout => $request_options->{timeout},
+            timeout => $timeout,
             credentials => $request_options->{credentials},
             username => $request_options->{username}, 
             password => $request_options->{password}
@@ -187,27 +204,21 @@ sub request {
     }
     $req = HTTP::Request->new($request_options->{method}, $uri);
 
-    my $content_type_forced;
+    my $content_type_forced = 0;
     foreach my $key (keys %{$request_options->{headers}}) {
-        if ($key !~ /content-type/i) {
-            $req->header($key => $request_options->{headers}->{$key});
-        } else {
-            $content_type_forced = $request_options->{headers}->{$key};
+        $req->header($key => $request_options->{headers}->{$key});
+        if ($key =~ /content-type/i) {
+            $content_type_forced = 1;
         }
     }
 
-    if ($request_options->{method} ne 'GET') {
-        if (defined($content_type_forced)) {
-            $req->content_type($content_type_forced);
-            $req->content($request_options->{query_form_post});
-        } else {
-            my $uri_post = URI->new();
-            if (defined($request_options->{post_params})) {
-                $uri_post->query_form($request_options->{post_params});
-            }
-            $req->content_type('application/x-www-form-urlencoded');
-            $req->content($uri_post->query);
-        }
+    if ($content_type_forced == 1) {
+        $req->content($request_options->{query_form_post});
+    } elsif (defined($options{request}->{post_params})) {
+        my $uri_post = URI->new();
+        $uri_post->query_form($request_options->{post_params});
+        $req->content_type('application/x-www-form-urlencoded');
+        $req->content($uri_post->query);
     }
 
     if (defined($request_options->{credentials}) && defined($request_options->{ntlmv2})) {
@@ -246,14 +257,15 @@ sub request {
         local $SIG{__WARN__} = sub { $message = $_[0]; };
         local $SIG{__DIE__} = sub { $message = $_[0]; };
 
+        my $code = $self->{response}->code();
         if (defined($request_options->{critical_status}) && $request_options->{critical_status} ne '' &&
-            eval "$request_options->{critical_status}") {
+            $self->{output}->test_eval(test => $request_options->{critical_status}, values => { code => $code })) {
             $status = 'critical';
         } elsif (defined($request_options->{warning_status}) && $request_options->{warning_status} ne '' &&
-            eval "$request_options->{warning_status}") {
+            $self->{output}->test_eval(test => $request_options->{warning_status}, values => { code => $code })) {
             $status = 'warning';
         } elsif (defined($request_options->{unknown_status}) && $request_options->{unknown_status} ne '' &&
-            eval "$request_options->{unknown_status}") {
+            $self->{output}->test_eval(test => $request_options->{unknown_status}, values => { code => $code })) {
             $status = 'unknown';
         }
     };
@@ -327,6 +339,19 @@ sub get_message {
     my ($self, %options) = @_;
 
     return $self->{response}->message();
+}
+
+sub get_certificate {
+    my ($self, %options) = @_;
+
+    my ($con) = $self->{cache}->get_connections('https');
+    return ('socket', $con);
+}
+
+sub get_times {
+    my ($self, %options) = @_;
+
+    return undef;
 }
 
 1;
